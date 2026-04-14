@@ -1,34 +1,35 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:smb_connect/smb_connect.dart';
+import 'package:dart_smb2/dart_smb2.dart';
 
 Future<List<Map<String, dynamic>>> fetchAppsFromDb(String smbUrl) async {
   final uri = Uri.parse(smbUrl);
-  final host = uri.host;
-  final path = uri.path;
+  final host = uri.host.isNotEmpty ? uri.host : "100.95.32.89";
+  final pathSegments = uri.pathSegments;
+  
+  if (pathSegments.isEmpty) {
+     throw Exception("Invalid SMB URL, no share defined.");
+  }
+  
+  final share = pathSegments.first;
+  final relativePath = pathSegments.skip(1).join('/');
 
-  final connect = await SmbConnect.connectAuth(
-    host: host.isNotEmpty ? host : "100.95.32.89",
-    domain: "",
-    username: "",
-    password: "",
+  final pool = await Smb2Pool.connect(
+    host: host,
+    share: share,
+    user: 'guest',
+    password: '',
+    workers: 1,
   );
 
-  final smbFile = await connect.file(path);
-  final reader = await connect.openRead(smbFile);
+  final data = await pool.readFile(relativePath);
+  await pool.disconnect();
   
   final directory = await getTemporaryDirectory();
   final localPath = '${directory.path}/apps.db';
   final localFile = File(localPath);
-  final ioSink = localFile.openWrite();
-  
-  await for (var data in reader) {
-    ioSink.add(data);
-  }
-  await ioSink.flush();
-  await ioSink.close();
-  await connect.close();
+  await localFile.writeAsBytes(data);
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
