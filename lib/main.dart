@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+
 import 'db_service.dart';
 
 double _parseRating(dynamic rating) {
@@ -18,7 +18,7 @@ double _parseRating(dynamic rating) {
     r = double.tryParse(rating.toString()) ?? 0.0;
   }
   if (r > 10) return r / 20.0; // out of 100 -> out of 5
-  if (r > 5) return r / 2.0;   // out of 10 -> out of 5
+  if (r > 5) return r / 2.0; // out of 10 -> out of 5
   return r;
 }
 
@@ -391,14 +391,17 @@ class _AppCardState extends State<_AppCard> {
 
   List<String> get _allImages {
     final images = <String>[];
-    if (widget.app['thumbnail_url'] != null && widget.app['thumbnail_url'].toString().isNotEmpty) {
+    if (widget.app['thumbnail_url'] != null &&
+        widget.app['thumbnail_url'].toString().isNotEmpty) {
       images.add(widget.app['thumbnail_url']);
     }
     if (widget.app['screenshots'] != null) {
       try {
         final decoded = jsonDecode(widget.app['screenshots']);
         if (decoded is List) {
-          images.addAll(decoded.map((e) => e.toString()).where((e) => e.isNotEmpty));
+          images.addAll(
+            decoded.map((e) => e.toString()).where((e) => e.isNotEmpty),
+          );
         }
       } catch (_) {}
     }
@@ -438,20 +441,23 @@ class _AppCardState extends State<_AppCard> {
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                     ),
                     child: const Text('Cancel', style: TextStyle(fontSize: 18)),
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      Navigator.of(context).pop(); // Close the bottom sheet first
-                      
+                      Navigator.of(
+                        context,
+                      ).pop(); // Close the bottom sheet first
+
                       try {
                         final response = await http.post(
                           Uri.parse('${widget.apiUrl}/install'),
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
+                          headers: {'Content-Type': 'application/json'},
                           body: json.encode({'app_id': widget.app['id']}),
                         );
 
@@ -486,11 +492,18 @@ class _AppCardState extends State<_AppCard> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
                     ),
                     child: const Text(
                       'Install',
-                      style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -544,7 +557,11 @@ class _AppCardState extends State<_AppCard> {
                             height: 250,
                             color: Colors.grey[800],
                             child: const Center(
-                              child: Icon(Icons.vrpano, size: 80, color: Colors.white54),
+                              child: Icon(
+                                Icons.vrpano,
+                                size: 80,
+                                color: Colors.white54,
+                              ),
                             ),
                           ),
                         ),
@@ -558,7 +575,11 @@ class _AppCardState extends State<_AppCard> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Center(
-                          child: Icon(Icons.vrpano, size: 80, color: Colors.white54),
+                          child: Icon(
+                            Icons.vrpano,
+                            size: 80,
+                            color: Colors.white54,
+                          ),
                         ),
                       ),
                     const SizedBox(width: 32),
@@ -738,15 +759,21 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                 ),
                                 onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(context);
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
+                                  );
                                   try {
-                                    final response = await http.post(
-                                      Uri.parse('${widget.apiUrl}/install'),
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: json.encode({'app_id': widget.app['id']}),
-                                    ).timeout(const Duration(seconds: 10));
+                                    final response = await http
+                                        .post(
+                                          Uri.parse('${widget.apiUrl}/install'),
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                          },
+                                          body: json.encode({
+                                            'app_id': widget.app['id'],
+                                          }),
+                                        )
+                                        .timeout(const Duration(seconds: 10));
 
                                     if (!context.mounted) return;
 
@@ -809,18 +836,23 @@ class _AppCardState extends State<_AppCard> {
                                     ),
                                   ),
                                   onPressed: () async {
-                                    String urlString = widget.app['trailer_url'];
+                                    String urlString =
+                                        widget.app['trailer_url'];
                                     if (!urlString.startsWith('http://') &&
                                         !urlString.startsWith('https://')) {
                                       urlString = 'https://$urlString';
                                     }
-                                    
-                                    final videoId = YoutubePlayerController.convertUrlToId(urlString);
-                                    
+
+                                    final videoId =
+                                        YoutubePlayerController.convertUrlToId(
+                                          urlString,
+                                        );
+
                                     if (videoId != null && context.mounted) {
                                       showDialog(
                                         context: context,
-                                        builder: (context) => _TrailerDialog(videoId: videoId),
+                                        builder: (context) =>
+                                            _TrailerDialog(videoId: videoId),
                                       );
                                     } else {
                                       final url = Uri.parse(urlString);
@@ -890,20 +922,31 @@ class _AppCardState extends State<_AppCard> {
                             errorBuilder: (_, _, _) => Container(
                               color: Colors.grey[800],
                               child: const Center(
-                                child: Icon(Icons.vrpano, size: 64, color: Colors.white54),
+                                child: Icon(
+                                  Icons.vrpano,
+                                  size: 64,
+                                  color: Colors.white54,
+                                ),
                               ),
                             ),
                           ),
                           if (_isHovered && hasMultipleImages)
                             Positioned.fill(
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.chevron_left, color: Colors.white, size: 32),
+                                    icon: const Icon(
+                                      Icons.chevron_left,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
                                     onPressed: () {
                                       setState(() {
-                                        _currentImageIndex = (_currentImageIndex - 1) % images.length;
+                                        _currentImageIndex =
+                                            (_currentImageIndex - 1) %
+                                            images.length;
                                         if (_currentImageIndex < 0) {
                                           _currentImageIndex += images.length;
                                         }
@@ -915,10 +958,16 @@ class _AppCardState extends State<_AppCard> {
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.chevron_right, color: Colors.white, size: 32),
+                                    icon: const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
                                     onPressed: () {
                                       setState(() {
-                                        _currentImageIndex = (_currentImageIndex + 1) % images.length;
+                                        _currentImageIndex =
+                                            (_currentImageIndex + 1) %
+                                            images.length;
                                       });
                                     },
                                     style: IconButton.styleFrom(
@@ -938,12 +987,16 @@ class _AppCardState extends State<_AppCard> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(images.length, (index) {
                                   return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
                                     width: _currentImageIndex == index ? 8 : 6,
                                     height: _currentImageIndex == index ? 8 : 6,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: _currentImageIndex == index ? Colors.white : Colors.white54,
+                                      color: _currentImageIndex == index
+                                          ? Colors.white
+                                          : Colors.white54,
                                     ),
                                   );
                                 }),
@@ -954,7 +1007,11 @@ class _AppCardState extends State<_AppCard> {
                     : Container(
                         color: Colors.grey[800],
                         child: const Center(
-                          child: Icon(Icons.vrpano, size: 64, color: Colors.white54),
+                          child: Icon(
+                            Icons.vrpano,
+                            size: 64,
+                            color: Colors.white54,
+                          ),
                         ),
                       ),
               ),
@@ -1170,9 +1227,7 @@ class _TrailerDialogState extends State<_TrailerDialog> {
     _controller = YoutubePlayerController.fromVideoId(
       videoId: widget.videoId,
       autoPlay: true,
-      params: const YoutubePlayerParams(
-        showFullscreenButton: true,
-      ),
+      params: const YoutubePlayerParams(showFullscreenButton: true),
     );
   }
 
@@ -1194,9 +1249,7 @@ class _TrailerDialogState extends State<_TrailerDialog> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: YoutubePlayer(
-                controller: _controller,
-              ),
+              child: YoutubePlayer(controller: _controller),
             ),
             Positioned(
               top: -10,
