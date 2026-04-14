@@ -18,8 +18,8 @@ Future<List<Map<String, dynamic>>> fetchAppsFromDb(String smbUrl) async {
   final pool = await Smb2Pool.connect(
     host: host,
     share: share,
-    user: 'guest',
-    password: '',
+    user: 'liakos',
+    password: 'stella.elias.240922',
     workers: 1,
   );
 
