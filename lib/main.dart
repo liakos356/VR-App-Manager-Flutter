@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -31,7 +32,7 @@ String _formatBytes(dynamic bytes) {
     bytesInt = int.tryParse(bytes.toString()) ?? 0;
   }
   if (bytesInt <= 0) return 'Unknown Size';
-  
+
   if (bytesInt < 1024 * 1024) {
     return '${(bytesInt / 1024).toStringAsFixed(1)} KB';
   } else if (bytesInt < 1024 * 1024 * 1024) {
@@ -39,6 +40,28 @@ String _formatBytes(dynamic bytes) {
   } else {
     return '${(bytesInt / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
+}
+
+int _getAppSize(dynamic app) {
+  if (app == null) return 0;
+  int sizeApk = _getApkSize(app);
+  int sizeObb = _getObbSize(app);
+
+  int total = sizeApk + sizeObb;
+  if (total == 0 && app['size_bytes'] != null) {
+    total = int.tryParse(app['size_bytes'].toString()) ?? 0;
+  }
+  return total;
+}
+
+int _getApkSize(dynamic app) {
+  if (app == null || app['size_bytes_apk'] == null) return 0;
+  return int.tryParse(app['size_bytes_apk'].toString()) ?? 0;
+}
+
+int _getObbSize(dynamic app) {
+  if (app == null || app['size_bytes_obb'] == null) return 0;
+  return int.tryParse(app['size_bytes_obb'].toString()) ?? 0;
 }
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
@@ -122,11 +145,57 @@ class _MainScreenState extends State<MainScreen> {
   String _searchQuery = '';
   String _sortOption = 'Name (A-Z)';
   String _categoryFilter = 'All Categories';
+  String _tagFilter = 'All Tags';
+
+  List<String> _searchHistory = [];
+  final SearchController _searchController = SearchController();
 
   @override
   void initState() {
     super.initState();
+    _loadSearchHistory();
     _fetchApps();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _searchHistory = prefs.getStringList('searchHistory') ?? [];
+    });
+  }
+
+  Future<void> _saveSearchHistory(String query) async {
+    if (query.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('searchHistory') ?? [];
+    history.remove(query);
+    history.insert(0, query);
+    if (history.length > 4) {
+      history = history.sublist(0, 4);
+    }
+    await prefs.setStringList('searchHistory', history);
+    setState(() {
+      _searchHistory = history;
+    });
+  }
+
+  Future<void> _clearSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('searchHistory');
+    setState(() {
+      _searchHistory = [];
+    });
   }
 
   Future<void> _fetchApps() async {
@@ -170,6 +239,41 @@ class _MainScreenState extends State<MainScreen> {
     return sortedList;
   }
 
+  List<String> get _availableTags {
+    final Set<String> tagsSet = {'All Tags'};
+    for (var app in _apps) {
+      if (app['tags'] != null) {
+        final tagsStr = app['tags'].toString();
+        if (tagsStr.trim().isEmpty) continue;
+
+        try {
+          final List<dynamic> parsed = jsonDecode(tagsStr);
+          for (var t in parsed) {
+            final trimmed = t.toString().trim();
+            if (trimmed.isNotEmpty) {
+              tagsSet.add(trimmed);
+            }
+          }
+        } catch (_) {
+          final splits = tagsStr.replaceAll(RegExp(r'[\[\]"]'), '').split(',');
+          for (var t in splits) {
+            final trimmed = t.trim();
+            if (trimmed.isNotEmpty) {
+              tagsSet.add(trimmed);
+            }
+          }
+        }
+      }
+    }
+    final sortedList = tagsSet.toList();
+    sortedList.sort((a, b) {
+      if (a == 'All Tags') return -1;
+      if (b == 'All Tags') return 1;
+      return a.compareTo(b);
+    });
+    return sortedList;
+  }
+
   List<dynamic> get _filteredAndSortedApps {
     List<dynamic> filtered = _apps.where((app) {
       final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
@@ -179,14 +283,38 @@ class _MainScreenState extends State<MainScreen> {
           (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
               .toString()
               .toLowerCase();
+
+      bool matchesTag = _tagFilter == 'All Tags';
+      String allTagsString = '';
+      if (app['tags'] != null) {
+        final tagsStr = app['tags'].toString();
+        allTagsString = tagsStr.toLowerCase();
+        if (!matchesTag) {
+          try {
+            final List<dynamic> parsed = jsonDecode(tagsStr);
+            matchesTag = parsed.any(
+              (tag) => tag.toString().trim() == _tagFilter,
+            );
+          } catch (_) {
+            final splits = tagsStr
+                .replaceAll(RegExp(r'[\[\]"]'), '')
+                .split(',');
+            matchesTag = splits.any((tag) => tag.trim() == _tagFilter);
+          }
+        }
+      }
+
       final query = _searchQuery.toLowerCase();
-      final matchesSearch = name.contains(query) || category.contains(query);
+      final matchesSearch =
+          name.contains(query) ||
+          category.contains(query) ||
+          allTagsString.contains(query);
 
       final matchesCategory =
           _categoryFilter == 'All Categories' ||
           category.contains(_categoryFilter.toLowerCase());
 
-      return matchesSearch && matchesCategory;
+      return matchesSearch && matchesCategory && matchesTag;
     }).toList();
 
     filtered.sort((a, b) {
@@ -206,6 +334,14 @@ class _MainScreenState extends State<MainScreen> {
         final scoreA = _parseRating(a['user_rating']);
         final scoreB = _parseRating(b['user_rating']);
         return scoreA.compareTo(scoreB);
+      } else if (_sortOption == 'Size (Large to Small)') {
+        final sizeA = _getAppSize(a);
+        final sizeB = _getAppSize(b);
+        return sizeB.compareTo(sizeA);
+      } else if (_sortOption == 'Size (Small to Large)') {
+        final sizeA = _getAppSize(a);
+        final sizeB = _getAppSize(b);
+        return sizeA.compareTo(sizeB);
       }
       return 0;
     });
@@ -216,34 +352,129 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final displayedApps = _filteredAndSortedApps;
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            const Text(
-              'Pico 4 App Manager',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+            Text(
+              'Pico 4 App Manager (${displayedApps.length})',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
             ),
             const Spacer(),
             Flexible(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 height: 40,
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search apps...',
-                    prefixIcon: Icon(Icons.search, size: 20),
-                    contentPadding: EdgeInsets.symmetric(
-                      vertical: 0,
-                      horizontal: 16,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
+                child: SearchAnchor(
+                  searchController: _searchController,
+                  viewConstraints: const BoxConstraints(maxHeight: 300),
+                  builder: (BuildContext context, SearchController controller) {
+                    return TextField(
+                      controller: controller,
+                      onTap: () => controller.openView(),
+                      onChanged: (_) => controller.openView(),
+                      onSubmitted: (value) {
+                        _saveSearchHistory(value);
+                        controller.closeView(value);
+                      },
+                      decoration: const InputDecoration(
+                        hintText: 'Search apps...',
+                        prefixIcon: Icon(Icons.search, size: 20),
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: 0,
+                          horizontal: 16,
+                        ),
+                      ),
+                    );
                   },
+                  suggestionsBuilder:
+                      (BuildContext context, SearchController controller) {
+                        final String query = controller.text.toLowerCase();
+                        if (query.isEmpty) {
+                          final List<Widget> historyItems = _searchHistory.map((
+                            String historyItem,
+                          ) {
+                            return ListTile(
+                              leading: const Icon(Icons.history),
+                              title: Text(historyItem),
+                              onTap: () {
+                                controller.closeView(historyItem);
+                                _saveSearchHistory(historyItem);
+                              },
+                            );
+                          }).toList();
+
+                          if (historyItems.isNotEmpty) {
+                            historyItems.add(
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                ),
+                                title: const Text(
+                                  'Clear history',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                onTap: () {
+                                  _clearSearchHistory();
+                                  controller.closeView('');
+                                  Future.delayed(
+                                    const Duration(milliseconds: 50),
+                                    () => controller.openView(),
+                                  );
+                                },
+                              ),
+                            );
+                          }
+                          return historyItems;
+                        }
+
+                        Set<String> suggestions = {};
+                        for (var app in _apps) {
+                          final name = (app['name'] ?? '').toString();
+                          if (name.toLowerCase().contains(query)) {
+                            suggestions.add(name);
+                          }
+
+                          final categoryStr = (app['category'] ?? '')
+                              .toString();
+                          if (categoryStr.isNotEmpty) {
+                            final cats = categoryStr
+                                .replaceAll(RegExp(r'[\[\]"]'), '')
+                                .split(',');
+                            for (var c in cats) {
+                              if (c.trim().toLowerCase().contains(query)) {
+                                suggestions.add(c.trim());
+                              }
+                            }
+                          }
+
+                          final tagsStr = (app['tag'] ?? '').toString();
+                          if (tagsStr.isNotEmpty) {
+                            final tags = tagsStr
+                                .replaceAll(RegExp(r'[\[\]"]'), '')
+                                .split(',');
+                            for (var t in tags) {
+                              if (t.trim().toLowerCase().contains(query)) {
+                                suggestions.add(t.trim());
+                              }
+                            }
+                          }
+                        }
+
+                        return suggestions.take(10).map((String suggestion) {
+                          return ListTile(
+                            leading: const Icon(Icons.search),
+                            title: Text(suggestion),
+                            onTap: () {
+                              controller.closeView(suggestion);
+                              _saveSearchHistory(suggestion);
+                            },
+                          );
+                        });
+                      },
                 ),
               ),
             ),
@@ -291,6 +522,37 @@ class _MainScreenState extends State<MainScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
+                  value: _tagFilter,
+                  icon: const Icon(Icons.label, size: 20),
+                  items: _availableTags.map((String tag) {
+                    return DropdownMenuItem<String>(
+                      value: tag,
+                      child: Text(tag),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _tagFilter = value;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color:
+                    Theme.of(context).inputDecorationTheme.fillColor ??
+                    Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
                   value: _sortOption,
                   icon: const Icon(Icons.sort, size: 20),
                   items: const [
@@ -309,6 +571,14 @@ class _MainScreenState extends State<MainScreen> {
                     DropdownMenuItem(
                       value: 'Rating (Low to High)',
                       child: Text('Rating (Low to High)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Size (Large to Small)',
+                      child: Text('Size (Large to Small)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Size (Small to Large)',
+                      child: Text('Size (Small to Large)'),
                     ),
                   ],
                   onChanged: (value) {
@@ -350,7 +620,6 @@ class _MainScreenState extends State<MainScreen> {
                     : constraints.maxWidth > 800
                     ? 4
                     : 2;
-                final displayedApps = _filteredAndSortedApps;
 
                 return GridView.builder(
                   padding: const EdgeInsets.symmetric(
@@ -487,31 +756,45 @@ class _AppCardState extends State<_AppCard> {
                       Navigator.of(context).pop();
 
                       final scaffoldMessenger = ScaffoldMessenger.of(context);
-                      final String appId = widget.app['id'] ?? '';
+                      final String appId = widget.app['id']?.toString() ?? '';
 
                       if (appId.isEmpty) {
                         scaffoldMessenger.showSnackBar(
-                          const SnackBar(content: Text('Invalid Object: App ID is empty', style: TextStyle(fontSize: 16)), backgroundColor: Colors.red),
+                          const SnackBar(
+                            content: Text(
+                              'Invalid Object: App ID is empty',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
                         );
                         return;
                       }
 
                       scaffoldMessenger.showSnackBar(
                         const SnackBar(
-                          content: Text('Starting Background Install...', style: TextStyle(fontSize: 16)),
+                          content: Text(
+                            'Starting Background Install...',
+                            style: TextStyle(fontSize: 16),
+                          ),
                           backgroundColor: Colors.blue,
                         ),
                       );
 
                       try {
-                        await InstallService.installAppLocally(appId, (progress) {
-                           // Show quick feedback per step, could be noisy but helpful
-                           debugPrint("Feedback: $progress");
+                        await InstallService.installAppLocally(appId: appId, apkPath: widget.app['file_path_apk']?.toString() ?? '', obbDir: widget.app['file_path_obb']?.toString() ?? '', onProgress: (
+                          progress,
+                        ) {
+                          // Show quick feedback per step, could be noisy but helpful
+                          debugPrint("Feedback: $progress");
                         });
                       } catch (e) {
                         scaffoldMessenger.showSnackBar(
                           SnackBar(
-                            content: Text('Installation Failed: $e', style: const TextStyle(fontSize: 16)),
+                            content: Text(
+                              'Installation Failed: $e',
+                              style: const TextStyle(fontSize: 16),
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -551,6 +834,27 @@ class _AppCardState extends State<_AppCard> {
           screenshots = decoded.map((e) => e.toString()).toList();
         }
       } catch (_) {}
+    }
+
+    List<String> tags = [];
+    if (widget.app['tags'] != null) {
+      final tagsStr = widget.app['tags'].toString();
+      if (tagsStr.trim().isNotEmpty) {
+        try {
+          final List<dynamic> parsed = jsonDecode(tagsStr);
+          tags = parsed
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+        } catch (_) {
+          tags = tagsStr
+              .replaceAll(RegExp(r'[\[\]"]'), '')
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+        }
+      }
     }
 
     showDialog(
@@ -623,14 +927,18 @@ class _AppCardState extends State<_AppCard> {
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          if (widget.app['size_bytes'] != null)
+                          if (_getAppSize(widget.app) > 0)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 20.0),
                               child: Text(
-                                "Size: ${_formatBytes(widget.app['size_bytes'])}",
+                                "Size: ${_formatBytes(_getAppSize(widget.app))}${_getObbSize(widget.app) > 0 ? '\n(APK: ${_formatBytes(_getApkSize(widget.app))} + OBB: ${_formatBytes(_getObbSize(widget.app))})' : ''}",
                                 style: TextStyle(
                                   fontSize: 18,
-                                  color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.color
+                                      ?.withValues(alpha: 0.7),
                                 ),
                               ),
                             )
@@ -660,6 +968,44 @@ class _AppCardState extends State<_AppCard> {
                               ),
                             ),
                           ),
+                          if (tags.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: tags.map((tag) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .secondary
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.secondary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                           const SizedBox(height: 20),
                           Row(
                             children: [
@@ -810,31 +1156,55 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                 ),
                                 onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  final String appId = widget.app['id'] ?? '';
-                                  
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
+                                  );
+                                  final String appId =
+                                      widget.app['id']?.toString() ?? '';
+                                  final String apkPath =
+                                      widget.app['apk_path']?.toString() ?? '';
+                                  final String obbDir =
+                                      widget.app['obb_dir']?.toString() ?? '';
+
                                   if (appId.isEmpty) {
                                     messenger.showSnackBar(
-                                      const SnackBar(content: Text('Invalid Object: App ID is empty', style: TextStyle(fontSize: 16)), backgroundColor: Colors.red),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Invalid Object: App ID is empty',
+                                          style: TextStyle(fontSize: 16),
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
                                     );
                                     return;
                                   }
 
                                   messenger.showSnackBar(
                                     const SnackBar(
-                                      content: Text('Starting Installation...', style: TextStyle(fontSize: 16)),
+                                      content: Text(
+                                        'Starting Installation...',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
                                       backgroundColor: Colors.blue,
                                     ),
                                   );
 
                                   try {
-                                    await InstallService.installAppLocally(appId, (progress) {
-                                       debugPrint('Status: $progress');
-                                    });
+                                    await InstallService.installAppLocally(
+                                      appId: appId,
+                                      apkPath: apkPath,
+                                      obbDir: obbDir,
+                                      onProgress: (progress) {
+                                        debugPrint('Status: $progress');
+                                      },
+                                    );
                                   } catch (e) {
                                     messenger.showSnackBar(
                                       SnackBar(
-                                        content: Text('Install Error: $e', style: const TextStyle(fontSize: 18)),
+                                        content: Text(
+                                          'Install Error: $e',
+                                          style: const TextStyle(fontSize: 18),
+                                        ),
                                         backgroundColor: Colors.red,
                                       ),
                                     );
@@ -1064,26 +1434,32 @@ class _AppCardState extends State<_AppCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            AutoSizeText(
-                              ((widget.app['name'] ?? widget.app['title']) ??
-                                      widget.app['title']) ??
-                                  'Unknown App',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                            Flexible(
+                              child: AutoSizeText(
+                                ((widget.app['name'] ?? widget.app['title']) ??
+                                        widget.app['title']) ??
+                                    'Unknown App',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                minFontSize: 12,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              minFontSize: 12,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            if (widget.app['size_bytes'] != null)
+                            if (_getAppSize(widget.app) > 0)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Text(
-                                  'Size: ${_formatBytes(widget.app['size_bytes'])}',
+                                  'Size: ${_formatBytes(_getAppSize(widget.app))}',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.color
+                                        ?.withValues(alpha: 0.7),
                                   ),
                                 ),
                               ),
