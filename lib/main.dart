@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
+import 'install_service.dart';
 import 'db_service.dart';
 
 double _parseRating(dynamic rating) {
@@ -20,6 +20,25 @@ double _parseRating(dynamic rating) {
   if (r > 10) return r / 20.0; // out of 100 -> out of 5
   if (r > 5) return r / 2.0; // out of 10 -> out of 5
   return r;
+}
+
+String _formatBytes(dynamic bytes) {
+  if (bytes == null) return 'Unknown Size';
+  int bytesInt = 0;
+  if (bytes is num) {
+    bytesInt = bytes.toInt();
+  } else {
+    bytesInt = int.tryParse(bytes.toString()) ?? 0;
+  }
+  if (bytesInt <= 0) return 'Unknown Size';
+  
+  if (bytesInt < 1024 * 1024) {
+    return '${(bytesInt / 1024).toStringAsFixed(1)} KB';
+  } else if (bytesInt < 1024 * 1024 * 1024) {
+    return '${(bytesInt / (1024 * 1024)).toStringAsFixed(1)} MB';
+  } else {
+    return '${(bytesInt / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
 }
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
@@ -129,7 +148,9 @@ class _MainScreenState extends State<MainScreen> {
   List<String> get _availableCategories {
     final Set<String> categories = {'All Categories'};
     for (var app in _apps) {
-      final catString = (app['categories'] ?? '').toString();
+      final catString =
+          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
+              .toString();
       if (catString.isNotEmpty) {
         final splits = catString.split(',');
         for (var c in splits) {
@@ -151,8 +172,13 @@ class _MainScreenState extends State<MainScreen> {
 
   List<dynamic> get _filteredAndSortedApps {
     List<dynamic> filtered = _apps.where((app) {
-      final name = (app['name'] ?? '').toString().toLowerCase();
-      final category = (app['categories'] ?? '').toString().toLowerCase();
+      final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
+          .toString()
+          .toLowerCase();
+      final category =
+          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
+              .toString()
+              .toLowerCase();
       final query = _searchQuery.toLowerCase();
       final matchesSearch = name.contains(query) || category.contains(query);
 
@@ -391,9 +417,17 @@ class _AppCardState extends State<_AppCard> {
 
   List<String> get _allImages {
     final images = <String>[];
-    if (widget.app['thumbnail_url'] != null &&
-        widget.app['thumbnail_url'].toString().isNotEmpty) {
-      images.add(widget.app['thumbnail_url']);
+    if (((widget.app['thumbnail_url'] ?? widget.app['preview_photo']) ??
+                widget.app['preview_photo']) !=
+            null &&
+        ((widget.app['thumbnail_url'] ?? widget.app['preview_photo']) ??
+                widget.app['preview_photo'])
+            .toString()
+            .isNotEmpty) {
+      images.add(
+        ((widget.app['thumbnail_url'] ?? widget.app['preview_photo']) ??
+            widget.app['preview_photo']),
+      );
     }
     if (widget.app['screenshots'] != null) {
       try {
@@ -421,7 +455,7 @@ class _AppCardState extends State<_AppCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Install ${widget.app['name'] ?? 'App'}?',
+                'Install ${((widget.app['name'] ?? widget.app['title']) ?? widget.app['title']) ?? 'App'}?',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -450,41 +484,34 @@ class _AppCardState extends State<_AppCard> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      Navigator.of(
-                        context,
-                      ).pop(); // Close the bottom sheet first
+                      Navigator.of(context).pop();
+
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final String appId = widget.app['id'] ?? '';
+
+                      if (appId.isEmpty) {
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(content: Text('Invalid Object: App ID is empty', style: TextStyle(fontSize: 16)), backgroundColor: Colors.red),
+                        );
+                        return;
+                      }
+
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Starting Background Install...', style: TextStyle(fontSize: 16)),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
 
                       try {
-                        final response = await http.post(
-                          Uri.parse('${widget.apiUrl}/install'),
-                          headers: {'Content-Type': 'application/json'},
-                          body: json.encode({'app_id': widget.app['id']}),
-                        );
-
-                        if (response.statusCode == 200) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Deployment instruction sent to PC via ADB! Check headset for USB Debugging prompt.',
-                                style: TextStyle(fontSize: 16),
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } else {
-                          throw Exception(
-                            'Server responded with ${response.statusCode}',
-                          );
-                        }
+                        await InstallService.installAppLocally(appId, (progress) {
+                           // Show quick feedback per step, could be noisy but helpful
+                           debugPrint("Feedback: $progress");
+                        });
                       } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        scaffoldMessenger.showSnackBar(
                           SnackBar(
-                            content: Text(
-                              'Installation Trigger Error: $e',
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                            content: Text('Installation Failed: $e', style: const TextStyle(fontSize: 16)),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -588,13 +615,28 @@ class _AppCardState extends State<_AppCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.app['name'] ?? 'Unknown App',
+                            ((widget.app['name'] ?? widget.app['title']) ??
+                                    widget.app['title']) ??
+                                'Unknown App',
                             style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          if (widget.app['size_bytes'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 20.0),
+                              child: Text(
+                                "Size: ${_formatBytes(widget.app['size_bytes'])}",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 20),
+
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -607,7 +649,10 @@ class _AppCardState extends State<_AppCard> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              widget.app['categories'] ?? 'Category',
+                              ((widget.app['categories'] ??
+                                          widget.app['category']) ??
+                                      widget.app['category']) ??
+                                  'Category',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -619,12 +664,16 @@ class _AppCardState extends State<_AppCard> {
                           Row(
                             children: [
                               _StarRating(
-                                score: _parseRating(widget.app['user_rating']),
+                                score: _parseRating(
+                                  ((widget.app['user_rating'] ??
+                                          widget.app['rating']) ??
+                                      widget.app['rating']),
+                                ),
                                 iconSize: 32,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                "${_parseRating(widget.app['user_rating']).toStringAsFixed(1).replaceAll('.0', '')}/5",
+                                "${_parseRating(((widget.app['user_rating'] ?? widget.app['rating']) ?? widget.app['rating'])).toStringAsFixed(1).replaceAll('.0', '')}/5",
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
@@ -715,7 +764,9 @@ class _AppCardState extends State<_AppCard> {
                         ],
                         Html(
                           data:
-                              widget.app['long_description'] ??
+                              ((widget.app['long_description'] ??
+                                      widget.app['description']) ??
+                                  widget.app['description']) ??
                               'No description available.',
                           style: {
                             "body": Style(
@@ -759,49 +810,31 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                 ),
                                 onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final String appId = widget.app['id'] ?? '';
+                                  
+                                  if (appId.isEmpty) {
+                                    messenger.showSnackBar(
+                                      const SnackBar(content: Text('Invalid Object: App ID is empty', style: TextStyle(fontSize: 16)), backgroundColor: Colors.red),
+                                    );
+                                    return;
+                                  }
+
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Starting Installation...', style: TextStyle(fontSize: 16)),
+                                      backgroundColor: Colors.blue,
+                                    ),
                                   );
+
                                   try {
-                                    final response = await http
-                                        .post(
-                                          Uri.parse('${widget.apiUrl}/install'),
-                                          headers: {
-                                            'Content-Type': 'application/json',
-                                          },
-                                          body: json.encode({
-                                            'app_id': widget.app['id'],
-                                          }),
-                                        )
-                                        .timeout(const Duration(seconds: 10));
-
-                                    if (!context.mounted) return;
-
-                                    if (response.statusCode == 200) {
-                                      Navigator.of(context).pop();
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Deployment instruction sent to PC via ADB! Check headset for USB Debugging prompt.',
-                                            style: TextStyle(fontSize: 18),
-                                          ),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    } else {
-                                      throw Exception(
-                                        'Server responded with ${response.statusCode}',
-                                      );
-                                    }
+                                    await InstallService.installAppLocally(appId, (progress) {
+                                       debugPrint('Status: $progress');
+                                    });
                                   } catch (e) {
-                                    if (!context.mounted) return;
-                                    Navigator.of(context).pop();
                                     messenger.showSnackBar(
                                       SnackBar(
-                                        content: Text(
-                                          'Installation Trigger Error: $e',
-                                          style: const TextStyle(fontSize: 18),
-                                        ),
+                                        content: Text('Install Error: $e', style: const TextStyle(fontSize: 18)),
                                         backgroundColor: Colors.red,
                                       ),
                                     );
@@ -809,7 +842,10 @@ class _AppCardState extends State<_AppCard> {
                                 },
                               ),
                             ),
-                            if (widget.app['trailer_url'] != null) ...[
+                            if (((widget.app['trailer_url'] ??
+                                        widget.app['video_url']) ??
+                                    widget.app['video_url']) !=
+                                null) ...[
                               const SizedBox(width: 24),
                               Expanded(
                                 child: ElevatedButton.icon(
@@ -837,7 +873,9 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                   onPressed: () async {
                                     String urlString =
-                                        widget.app['trailer_url'];
+                                        ((widget.app['trailer_url'] ??
+                                            widget.app['video_url']) ??
+                                        widget.app['video_url']);
                                     if (!urlString.startsWith('http://') &&
                                         !urlString.startsWith('https://')) {
                                       urlString = 'https://$urlString';
@@ -1023,15 +1061,33 @@ class _AppCardState extends State<_AppCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: AutoSizeText(
-                          widget.app['name'] ?? 'Unknown App',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          minFontSize: 12,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AutoSizeText(
+                              ((widget.app['name'] ?? widget.app['title']) ??
+                                      widget.app['title']) ??
+                                  'Unknown App',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              minFontSize: 12,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (widget.app['size_bytes'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(
+                                  'Size: ${_formatBytes(widget.app['size_bytes'])}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       Row(
@@ -1051,7 +1107,10 @@ class _AppCardState extends State<_AppCard> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: AutoSizeText(
-                                widget.app['categories'] ?? '',
+                                ((widget.app['categories'] ??
+                                            widget.app['category']) ??
+                                        widget.app['category']) ??
+                                    '',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
                                   fontSize: 16,
@@ -1065,7 +1124,11 @@ class _AppCardState extends State<_AppCard> {
                           ),
                           const SizedBox(width: 8),
                           _StarRating(
-                            score: _parseRating(widget.app['user_rating']),
+                            score: _parseRating(
+                              ((widget.app['user_rating'] ??
+                                      widget.app['rating']) ??
+                                  widget.app['rating']),
+                            ),
                             iconSize: 18,
                           ),
                         ],
