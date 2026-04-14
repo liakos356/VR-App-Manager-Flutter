@@ -141,11 +141,13 @@ class _MainScreenState extends State<MainScreen> {
 
   List<dynamic> _apps = [];
   bool _isLoading = false;
+  double _downloadProgress = -1.0;
 
   String _searchQuery = '';
   String _sortOption = 'Name (A-Z)';
   String _categoryFilter = 'All Categories';
   String _tagFilter = 'All Tags';
+  bool _ovrportFilter = false;
 
   List<String> _searchHistory = [];
   final SearchController _searchController = SearchController();
@@ -199,10 +201,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _fetchApps() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _downloadProgress = -1.0;
+    });
     try {
       final smbApps = await fetchAppsFromDb(
         "smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db",
+        onProgress: (progress) {
+          setState(() {
+            _downloadProgress = progress;
+          });
+        },
       );
       setState(() {
         _apps = smbApps;
@@ -210,7 +220,10 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       debugPrint('Error fetching apps from DB: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _downloadProgress = -1.0;
+      });
     }
   }
 
@@ -314,7 +327,14 @@ class _MainScreenState extends State<MainScreen> {
           _categoryFilter == 'All Categories' ||
           category.contains(_categoryFilter.toLowerCase());
 
-      return matchesSearch && matchesCategory && matchesTag;
+      final matchesOvrport =
+          !_ovrportFilter ||
+          (app['ovrport'] == 1 ||
+              app['ovrport'] == true ||
+              app['ovrport'] == '1' ||
+              app['ovrport'] == 'true');
+
+      return matchesSearch && matchesCategory && matchesTag && matchesOvrport;
     }).toList();
 
     filtered.sort((a, b) {
@@ -362,12 +382,12 @@ class _MainScreenState extends State<MainScreen> {
               'Pico 4 App Manager (${displayedApps.length})',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
             ),
-            const Spacer(),
-            Flexible(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 300),
+            const SizedBox(width: 24),
+            Expanded(
+              child: SizedBox(
                 height: 40,
                 child: SearchAnchor(
+                  isFullScreen: false,
                   searchController: _searchController,
                   viewConstraints: const BoxConstraints(maxHeight: 300),
                   builder: (BuildContext context, SearchController controller) {
@@ -433,13 +453,24 @@ class _MainScreenState extends State<MainScreen> {
 
                         Set<String> suggestions = {};
                         for (var app in _apps) {
-                          final name = (app['name'] ?? '').toString();
+                          final name = (app['name'] ?? app['title'] ?? '')
+                              .toString();
                           if (name.toLowerCase().contains(query)) {
                             suggestions.add(name);
+
+                            // Also suggest individual words from the app name for auto-completion inspiration
+                            final words = name.split(RegExp(r'\s+'));
+                            for (var w in words) {
+                              if (w.length > 2 &&
+                                  w.toLowerCase().startsWith(query)) {
+                                suggestions.add(w);
+                              }
+                            }
                           }
 
-                          final categoryStr = (app['category'] ?? '')
-                              .toString();
+                          final categoryStr =
+                              (app['categories'] ?? app['category'] ?? '')
+                                  .toString();
                           if (categoryStr.isNotEmpty) {
                             final cats = categoryStr
                                 .replaceAll(RegExp(r'[\[\]"]'), '')
@@ -451,7 +482,8 @@ class _MainScreenState extends State<MainScreen> {
                             }
                           }
 
-                          final tagsStr = (app['tag'] ?? '').toString();
+                          final tagsStr = (app['tags'] ?? app['tag'] ?? '')
+                              .toString();
                           if (tagsStr.isNotEmpty) {
                             final tags = tagsStr
                                 .replaceAll(RegExp(r'[\[\]"]'), '')
@@ -478,21 +510,20 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                    Theme.of(context).inputDecorationTheme.fillColor ??
-                    Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
+          ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60.0),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: Row(
+              children: [
+                _FilterDropdown(
                   value: _categoryFilter,
-                  icon: const Icon(Icons.category, size: 20),
+                  icon: Icons.category,
                   items: _availableCategories.map((String category) {
                     return DropdownMenuItem<String>(
                       value: category,
@@ -507,23 +538,10 @@ class _MainScreenState extends State<MainScreen> {
                     }
                   },
                 ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                    Theme.of(context).inputDecorationTheme.fillColor ??
-                    Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
+                const SizedBox(width: 16),
+                _FilterDropdown(
                   value: _tagFilter,
-                  icon: const Icon(Icons.label, size: 20),
+                  icon: Icons.label,
                   items: _availableTags.map((String tag) {
                     return DropdownMenuItem<String>(
                       value: tag,
@@ -538,23 +556,29 @@ class _MainScreenState extends State<MainScreen> {
                     }
                   },
                 ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color:
-                    Theme.of(context).inputDecorationTheme.fillColor ??
-                    Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
+                const SizedBox(width: 16),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Ovrport Only',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 4),
+                    Switch(
+                      value: _ovrportFilter,
+                      onChanged: (bool value) {
+                        setState(() {
+                          _ovrportFilter = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                _FilterDropdown(
                   value: _sortOption,
-                  icon: const Icon(Icons.sort, size: 20),
+                  icon: Icons.sort,
                   items: const [
                     DropdownMenuItem(
                       value: 'Name (A-Z)',
@@ -589,9 +613,9 @@ class _MainScreenState extends State<MainScreen> {
                     }
                   },
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           IconButton(
@@ -612,7 +636,27 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_downloadProgress < 0)
+                    const CircularProgressIndicator()
+                  else
+                    SizedBox(
+                      width: 200,
+                      child: LinearProgressIndicator(value: _downloadProgress),
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _downloadProgress < 0
+                        ? 'Fetching database...'
+                        : 'Fetching database... ${(_downloadProgress * 100).toStringAsFixed(1)}%',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ],
+              ),
+            )
           : LayoutBuilder(
               builder: (context, constraints) {
                 int crossAxisCount = constraints.maxWidth > 1200
@@ -640,6 +684,49 @@ class _MainScreenState extends State<MainScreen> {
                 );
               },
             ),
+    );
+  }
+}
+
+class _FilterDropdown extends StatelessWidget {
+  final String value;
+  final IconData icon;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String?> onChanged;
+
+  const _FilterDropdown({
+    required this.value,
+    required this.icon,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 2,
+      borderRadius: BorderRadius.circular(12),
+      color: Theme.of(context).cardColor,
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 8),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                icon: const Icon(Icons.arrow_drop_down, size: 20),
+                items: items,
+                onChanged: onChanged,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -683,6 +770,9 @@ class _AppCard extends StatefulWidget {
 class _AppCardState extends State<_AppCard> {
   bool _isHovered = false;
   int _currentImageIndex = 0;
+
+  bool _isInstalling = false;
+  double _installProgress = 0.0;
 
   List<String> get _allImages {
     final images = <String>[];
@@ -782,12 +872,16 @@ class _AppCardState extends State<_AppCard> {
                       );
 
                       try {
-                        await InstallService.installAppLocally(appId: appId, apkPath: widget.app['file_path_apk']?.toString() ?? '', obbDir: widget.app['file_path_obb']?.toString() ?? '', onProgress: (
-                          progress,
-                        ) {
-                          // Show quick feedback per step, could be noisy but helpful
-                          debugPrint("Feedback: $progress");
-                        });
+                        await InstallService.installAppLocally(
+                          appId: appId,
+                          apkPath:
+                              widget.app['file_path_apk']?.toString() ?? '',
+                          obbDir: widget.app['file_path_obb']?.toString() ?? '',
+                          onProgress: (progress) {
+                            // Show quick feedback per step, could be noisy but helpful
+                            debugPrint("Feedback: $progress");
+                          },
+                        );
                       } catch (e) {
                         scaffoldMessenger.showSnackBar(
                           SnackBar(
@@ -857,284 +951,384 @@ class _AppCardState extends State<_AppCard> {
       }
     }
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Theme.of(context).cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Container(
-            width: 1000,
-            height: 700,
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_allImages.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          _allImages.first,
-                          width: 400,
-                          height: 250,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Scaffold(
+            appBar: AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: Text(
+                ((widget.app['name'] ?? widget.app['title']) ??
+                        widget.app['title']) ??
+                    'Unknown App',
+              ),
+            ),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: Container(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_allImages.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            _allImages.first,
                             width: 400,
                             height: 250,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              width: 400,
+                              height: 250,
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.vrpano,
+                                  size: 80,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 400,
+                          height: 250,
+                          decoration: BoxDecoration(
                             color: Colors.grey[800],
-                            child: const Center(
-                              child: Icon(
-                                Icons.vrpano,
-                                size: 80,
-                                color: Colors.white54,
-                              ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.vrpano,
+                              size: 80,
+                              color: Colors.white54,
                             ),
                           ),
                         ),
-                      )
-                    else
-                      Container(
-                        width: 400,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.vrpano,
-                            size: 80,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 32),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            ((widget.app['name'] ?? widget.app['title']) ??
-                                    widget.app['title']) ??
-                                'Unknown App',
-                            style: const TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          if (_getAppSize(widget.app) > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 20.0),
-                              child: Text(
-                                "Size: ${_formatBytes(_getAppSize(widget.app))}${_getObbSize(widget.app) > 0 ? '\n(APK: ${_formatBytes(_getApkSize(widget.app))} + OBB: ${_formatBytes(_getObbSize(widget.app))})' : ''}",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.color
-                                      ?.withValues(alpha: 0.7),
-                                ),
-                              ),
-                            )
-                          else
-                            const SizedBox(height: 20),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              ((widget.app['categories'] ??
-                                          widget.app['category']) ??
-                                      widget.app['category']) ??
-                                  'Category',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                      const SizedBox(width: 32),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ((widget.app['name'] ?? widget.app['title']) ??
+                                      widget.app['title']) ??
+                                  'Unknown App',
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
-                          ),
-                          if (tags.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: tags.map((tag) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
+                            if (_getAppSize(widget.app) > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 20.0),
+                                child: Text(
+                                  "Size: ${_formatBytes(_getAppSize(widget.app))}${_getObbSize(widget.app) > 0 ? '\n(APK: ${_formatBytes(_getApkSize(widget.app))} + OBB: ${_formatBytes(_getObbSize(widget.app))})' : ''}",
+                                  style: TextStyle(
+                                    fontSize: 18,
                                     color: Theme.of(context)
-                                        .colorScheme
-                                        .secondary
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary
-                                          .withValues(alpha: 0.3),
-                                    ),
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.color
+                                        ?.withValues(alpha: 0.7),
                                   ),
-                                  child: Text(
-                                    tag,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.secondary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              _StarRating(
-                                score: _parseRating(
-                                  ((widget.app['user_rating'] ??
-                                          widget.app['rating']) ??
-                                      widget.app['rating']),
                                 ),
-                                iconSize: 32,
+                              )
+                            else
+                              const SizedBox(height: 20),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                "${_parseRating(((widget.app['user_rating'] ?? widget.app['rating']) ?? widget.app['rating'])).toStringAsFixed(1).replaceAll('.0', '')}/5",
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                ((widget.app['categories'] ??
+                                            widget.app['category']) ??
+                                        widget.app['category']) ??
+                                    'Category',
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  color: Theme.of(context).colorScheme.primary,
                                   fontWeight: FontWeight.bold,
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.color
-                                      ?.withValues(alpha: 0.7),
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            if (widget.app['ovrport'] == 1 ||
+                                widget.app['ovrport'] == true ||
+                                widget.app['ovrport'] == '1' ||
+                                widget.app['ovrport'] == 'true') ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.orange.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Ovrport',
+                                  style: TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        size: 40,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (screenshots.isNotEmpty) ...[
-                          Text(
-                            'Screenshots',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyLarge?.color,
+                            if (tags.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: tags.map((tag) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.secondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                _StarRating(
+                                  score: _parseRating(
+                                    ((widget.app['user_rating'] ??
+                                            widget.app['rating']) ??
+                                        widget.app['rating']),
+                                  ),
+                                  iconSize: 32,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "${_parseRating(((widget.app['user_rating'] ?? widget.app['rating']) ?? widget.app['rating'])).toStringAsFixed(1).replaceAll('.0', '')}/5",
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.color
+                                        ?.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 200,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: screenshots.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(width: 16),
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) =>
-                                          _FullscreenImageViewer(
-                                            imageUrls: screenshots,
-                                            initialIndex: index,
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 32),
+                      SizedBox(
+                        width: 280,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Material(
+                              color: _isInstalling
+                                  ? Colors.green.shade800
+                                  : Colors.green.shade600,
+                              clipBehavior: Clip.antiAlias,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                onTap: _isInstalling
+                                    ? null
+                                    : () async {
+                                        final messenger = ScaffoldMessenger.of(
+                                          context,
+                                        );
+                                        final String appId =
+                                            widget.app['id']?.toString() ?? '';
+                                        final String apkPath =
+                                            widget.app['apk_path']
+                                                ?.toString() ??
+                                            '';
+                                        final String obbDir =
+                                            widget.app['obb_dir']?.toString() ??
+                                            '';
+
+                                        if (appId.isEmpty) {
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Invalid Object: App ID is empty',
+                                                style: TextStyle(fontSize: 16),
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
+
+                                        setState(() {
+                                          _isInstalling = true;
+                                          _installProgress = 0.0;
+                                        });
+
+                                        try {
+                                          await InstallService.installAppLocally(
+                                            appId: appId,
+                                            apkPath: apkPath,
+                                            obbDir: obbDir,
+                                            onProgress: (progress) {
+                                              // we don't display the string progress right now
+                                            },
+                                            onDownloadProgress: (progress) {
+                                              if (mounted) {
+                                                setState(
+                                                  () => _installProgress =
+                                                      progress,
+                                                );
+                                              }
+                                            },
+                                          );
+
+                                          if (mounted) {
+                                            setState(() {
+                                              _isInstalling = false;
+                                              _installProgress = 0.0;
+                                            });
+                                          }
+                                          messenger.showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Done',
+                                                style: TextStyle(fontSize: 16),
+                                              ),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (mounted) {
+                                            setState(() {
+                                              _isInstalling = false;
+                                              _installProgress = 0.0;
+                                            });
+                                          }
+                                          messenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Install Error: $e',
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                ),
+                                              ),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                child: Stack(
+                                  children: [
+                                    if (_isInstalling && _installProgress > 0)
+                                      Positioned.fill(
+                                        child: FractionallySizedBox(
+                                          alignment: Alignment.centerLeft,
+                                          widthFactor: _installProgress.clamp(
+                                            0.0,
+                                            1.0,
                                           ),
-                                    );
-                                  },
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      screenshots[index],
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
-                                        height: 200,
-                                        width: 300,
-                                        color: Colors.grey[800],
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.vrpano,
-                                            size: 40,
-                                            color: Colors.white54,
+                                          child: Container(
+                                            color: Colors.green.shade600,
                                           ),
                                         ),
                                       ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 24,
+                                      ),
+                                      child: Center(
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            if (!_isInstalling)
+                                              const Icon(
+                                                Icons.download,
+                                                size: 32,
+                                                color: Colors.white,
+                                              )
+                                            else
+                                              const SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Colors.white,
+                                                      strokeWidth: 3,
+                                                    ),
+                                              ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              _isInstalling
+                                                  ? 'Installing (${(_installProgress * 100).toStringAsFixed(0)}%)'
+                                                  : 'Install',
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                        Html(
-                          data:
-                              ((widget.app['long_description'] ??
-                                      widget.app['description']) ??
-                                  widget.app['description']) ??
-                              'No description available.',
-                          style: {
-                            "body": Style(
-                              fontSize: FontSize(22.0),
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.color
-                                  ?.withValues(alpha: 0.8),
-                              lineHeight: LineHeight(1.6),
-                              margin: Margins.zero,
-                              padding: HtmlPaddings.zero,
-                            ),
-                          },
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
+                            if (((widget.app['trailer_url'] ??
+                                        widget.app['video_url']) ??
+                                    widget.app['video_url']) !=
+                                null) ...[
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green.shade600,
+                                  backgroundColor: Colors.red.shade600,
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 24,
                                   ),
@@ -1143,12 +1337,12 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                 ),
                                 icon: const Icon(
-                                  Icons.download,
+                                  Icons.play_circle_fill,
                                   size: 32,
                                   color: Colors.white,
                                 ),
                                 label: const Text(
-                                  'Install to Headset',
+                                  'Watch Trailer',
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -1156,147 +1350,163 @@ class _AppCardState extends State<_AppCard> {
                                   ),
                                 ),
                                 onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
-                                  );
-                                  final String appId =
-                                      widget.app['id']?.toString() ?? '';
-                                  final String apkPath =
-                                      widget.app['apk_path']?.toString() ?? '';
-                                  final String obbDir =
-                                      widget.app['obb_dir']?.toString() ?? '';
-
-                                  if (appId.isEmpty) {
-                                    messenger.showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Invalid Object: App ID is empty',
-                                          style: TextStyle(fontSize: 16),
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                    return;
+                                  String urlString =
+                                      ((widget.app['trailer_url'] ??
+                                          widget.app['video_url']) ??
+                                      widget.app['video_url']);
+                                  if (!urlString.startsWith('http://') &&
+                                      !urlString.startsWith('https://')) {
+                                    urlString = 'https://$urlString';
                                   }
 
-                                  messenger.showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Starting Installation...',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      backgroundColor: Colors.blue,
-                                    ),
-                                  );
+                                  final videoId =
+                                      YoutubePlayerController.convertUrlToId(
+                                        urlString,
+                                      );
 
-                                  try {
-                                    await InstallService.installAppLocally(
-                                      appId: appId,
-                                      apkPath: apkPath,
-                                      obbDir: obbDir,
-                                      onProgress: (progress) {
-                                        debugPrint('Status: $progress');
-                                      },
+                                  if (videoId != null && context.mounted) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) =>
+                                          _TrailerDialog(videoId: videoId),
                                     );
-                                  } catch (e) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Install Error: $e',
-                                          style: const TextStyle(fontSize: 18),
+                                  } else {
+                                    final url = Uri.parse(urlString);
+                                    try {
+                                      await launchUrl(
+                                        url,
+                                        mode: LaunchMode.inAppWebView,
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Could not launch trailer',
+                                          ),
                                         ),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
+                                      );
+                                    }
                                   }
                                 },
-                              ),
-                            ),
-                            if (((widget.app['trailer_url'] ??
-                                        widget.app['video_url']) ??
-                                    widget.app['video_url']) !=
-                                null) ...[
-                              const SizedBox(width: 24),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.purple.shade600,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 24,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.play_circle_fill,
-                                    size: 32,
-                                    color: Colors.white,
-                                  ),
-                                  label: const Text(
-                                    'Watch Trailer',
-                                    style: TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    String urlString =
-                                        ((widget.app['trailer_url'] ??
-                                            widget.app['video_url']) ??
-                                        widget.app['video_url']);
-                                    if (!urlString.startsWith('http://') &&
-                                        !urlString.startsWith('https://')) {
-                                      urlString = 'https://$urlString';
-                                    }
-
-                                    final videoId =
-                                        YoutubePlayerController.convertUrlToId(
-                                          urlString,
-                                        );
-
-                                    if (videoId != null && context.mounted) {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) =>
-                                            _TrailerDialog(videoId: videoId),
-                                      );
-                                    } else {
-                                      final url = Uri.parse(urlString);
-                                      try {
-                                        await launchUrl(
-                                          url,
-                                          mode: LaunchMode.inAppWebView,
-                                        );
-                                      } catch (e) {
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Could not launch trailer',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
                               ),
                             ],
                           ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (screenshots.isNotEmpty) ...[
+                            Text(
+                              'Screenshots',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 200,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: screenshots.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(width: 16),
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) =>
+                                            _FullscreenImageViewer(
+                                              imageUrls: screenshots,
+                                              initialIndex: index,
+                                            ),
+                                      );
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        screenshots[index],
+                                        height: 200,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          height: 200,
+                                          width: 300,
+                                          color: Colors.grey[800],
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.vrpano,
+                                              size: 40,
+                                              color: Colors.white54,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          Html(
+                            data:
+                                ((widget.app['long_description'] ??
+                                        widget.app['description']) ??
+                                    widget.app['description']) ??
+                                'No description available.',
+                            style: {
+                              "body": Style(
+                                fontSize: FontSize(22.0),
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.color
+                                    ?.withValues(alpha: 0.8),
+                                lineHeight: LineHeight(1.6),
+                                margin: Margins.zero,
+                                padding: HtmlPaddings.zero,
+                              ),
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offsetAnimation, child: child),
+          );
+        },
+      ),
     );
   }
 
@@ -1460,6 +1670,33 @@ class _AppCardState extends State<_AppCard> {
                                         .bodySmall
                                         ?.color
                                         ?.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ),
+                            if (widget.app['ovrport'] == 1 ||
+                                widget.app['ovrport'] == true ||
+                                widget.app['ovrport'] == '1' ||
+                                widget.app['ovrport'] == 'true')
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Ovrport',
+                                    style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
