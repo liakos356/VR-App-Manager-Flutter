@@ -134,7 +134,7 @@ class _AppCard extends StatelessWidget {
                           width: 400,
                           height: 250,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: 400, height: 250, color: Colors.grey[800],
                             child: const Center(child: Icon(Icons.broken_image, size: 50)),
                           ),
@@ -155,7 +155,7 @@ class _AppCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.purpleAccent.withOpacity(0.2),
+                              color: Colors.purpleAccent.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -211,14 +211,14 @@ class _AppCard extends StatelessWidget {
                              );
                              
                              if (response.statusCode == 200) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                if (!context.mounted) return; ScaffoldMessenger.of(context).showSnackBar(
                                    const SnackBar(content: Text('Deployment instruction sent to PC via ADB! Check headset for USB Debugging prompt.', style: TextStyle(fontSize: 18)), backgroundColor: Colors.green),
                                 );
                              } else {
                                 throw Exception('Server responded with ${response.statusCode}');
                              }
                           } catch (e) {
-                             ScaffoldMessenger.of(context).showSnackBar(
+                             if (!context.mounted) return; ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Installation Trigger Error: $e', style: const TextStyle(fontSize: 18)), backgroundColor: Colors.red),
                              );
                           }
@@ -272,7 +272,7 @@ class _AppCard extends StatelessWidget {
                   ? Image.network(
                       app['preview_photo'],
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: Colors.grey[800]),
+                      errorBuilder: (_, _, _) => Container(color: Colors.grey[800]),
                     )
                   : Container(color: Colors.grey[800]),
             ),
@@ -293,7 +293,7 @@ class _AppCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.purpleAccent.withOpacity(0.15),
+                        color: Colors.purpleAccent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
