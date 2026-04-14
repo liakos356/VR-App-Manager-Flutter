@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 void main() {
   String? extractYoutubeId(String url) {
     final RegExp regex = RegExp(
@@ -6,6 +7,6 @@ void main() {
     final match = regex.firstMatch(url);
     return match?.group(1);
   }
-  print(extractYoutubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
-  print(extractYoutubeId("https://youtu.be/dQw4w9WgXcQ"));
+  debugPrint(extractYoutubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+  debugPrint(extractYoutubeId("https://youtu.be/dQw4w9WgXcQ"));
 }

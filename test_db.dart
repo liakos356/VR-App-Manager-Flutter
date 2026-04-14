@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() async {
   sqfliteFfiInit();
@@ -6,7 +7,7 @@ void main() async {
   final result = await db.query('apps');
   for (var r in result) {
     if (r['trailer_url'] != null) {
-      print(r['trailer_url']);
+      debugPrint(r['trailer_url'].toString());
     }
   }
   await db.close();

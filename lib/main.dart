@@ -229,7 +229,7 @@ class _MainScreenState extends State<MainScreen> {
               decoration: BoxDecoration(
                 color:
                     Theme.of(context).inputDecorationTheme.fillColor ??
-                    Colors.grey.withOpacity(0.1),
+                    Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DropdownButtonHideUnderline(
@@ -260,7 +260,7 @@ class _MainScreenState extends State<MainScreen> {
               decoration: BoxDecoration(
                 color:
                     Theme.of(context).inputDecorationTheme.fillColor ??
-                    Colors.grey.withOpacity(0.1),
+                    Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DropdownButtonHideUnderline(
@@ -1087,7 +1087,6 @@ class _FullscreenImageViewer extends StatefulWidget {
   final int initialIndex;
 
   const _FullscreenImageViewer({
-    super.key,
     required this.imageUrls,
     this.initialIndex = 0,
   });
