@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/only-desktop.prompt.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703604,
+            "name": "Commit-0",
+            "content": "---\nagent: agent\n---\n\nFocus on optimizing UI design and development specifically for desktop (native and web) while ensuring no disruptions or functional regressions on mobile platforms.\n\n- Prioritize layouts, interaction patterns, and performance characteristics tailored to large screens, high‑resolution displays, and pointer/keyboard input on desktop OSes and desktop web.\n- Implement visual and interaction enhancements exclusively for desktop environments (web and native) without degrading or altering existing mobile behavior.\n- Safeguard mobile and tablet experiences by isolating desktop‑specific layout, navigation, and styling changes behind platform checks or viewport‑based conditions.\n- Avoid disrupting mobile or web layouts when making desktop-first improvements.\n- Document desktop breakpoints, input modality assumptions (mouse, trackpad, keyboard), and window-resizing behavior to maintain clear platform boundaries and predictable UI behavior.\n- Use platform detection (e.g., Flutter kIsWeb, Platform.isWindows/macOS/linux) and/or media queries to apply desktop‑only components, density, and interaction affordances.\n- Validate backward compatibility to keep native mobile apps and any future narrow‑screen layouts unaffected by desktop optimizations and experiments.\n"
+        }
+    ]
+}

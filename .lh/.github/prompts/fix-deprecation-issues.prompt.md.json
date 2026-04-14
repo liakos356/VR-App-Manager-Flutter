@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/fix-deprecation-issues.prompt.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703604,
+            "name": "Commit-0",
+            "content": "---\nagent: agent\n---\n\nRun `flutter analyze` on the **VR App Manager** Flutter project and use the analyzer output to systematically fix all deprecation notices, warnings, and strong-mode issues across the codebase.\n\nWhen you work, follow these steps:\n\n- Open the existing Flutter project in the `VR-App-Manager-Flutter` workspace and ensure it uses the documented stack (Flutter, Dart ^3.11.4, `http`, `url_launcher`).\n- Execute `flutter analyze` from the project root and capture the full output, including file paths, line numbers, error/warning codes, and deprecation messages.\n- Group the analyzer findings by category, for example: deprecated APIs, nullable/late issues, type mismatches, unused imports, dead code, outdated package usage, or lints from `analysis_options.yaml`.\n- For each category, propose concrete code changes that:\n  - Replace deprecated Flutter/Dart APIs with their current recommended alternatives.\n  - Update package usages (`http`, `url_launcher`) to non-deprecated methods or patterns, keeping compatibility with the versions in `pubspec.yaml`.\n  - Respect project constraints:\n    - Do not change the fundamental `StatefulWidget`/`setState` architecture.\n    - Do not introduce new state management frameworks.\n    - Keep initialization logic in `main()` / `runApp()`.\n- When a deprecation has multiple possible replacements, choose the option that:\n  - Minimizes code churn.\n  - Preserves existing behavior for all supported platforms (desktop, mobile, web).\n- After implementing changes, run `flutter analyze` again and confirm that all deprecations and warnings have been resolved or, if any remain, are explicitly justified.\n- Produce a final summary that includes:\n  - A short, categorized list of the main changes made.\n  - Any remaining warnings or deprecations that cannot be fixed yet, with an explanation.\n  - Any places where analyzer rules needed to be adjusted in `analysis_options.yaml`, with justification.\n"
+        }
+    ]
+}

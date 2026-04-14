@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/gen_ui_component_creation.prompt.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703604,
+            "name": "Commit-0",
+            "content": "You are an expert Flutter developer specializing in rich, interactive UI component design.\n\nI need you to create [INSERT NUMBER OR DESCRIPTION OF WIDGETS] new interactive Flutter UI components for the **VR App Manager**. Before creating new components, scan the existing widgets in `lib/main.dart` to understand what already exists (`AppManagerApp`, `MainScreen`, `_AppCard`). You must ensure you create something completely different and novel compared to the existing components. If no specific number or description is provided when this prompt is called, generate as many distinct, high-quality components as possible within your context limits. They must be highly interactive (using animations, gestures, hover effects, or state changes) and visually complement the dark purple/pink VR-themed dashboard.\n\nFor each new UI component, follow the strict architectural and linting rules below.\n\n### 1. Widget Implementation\n\nCreate the actual UI component in `lib/main.dart` or a new file under `lib/widgets/`.\n\n- Match the existing dark theme: `Color(0xFF111827)` background, `Color(0xFF1F2937)` card color, `Colors.purpleAccent` primary, `Colors.pinkAccent` secondary.\n- Make them interactive where applicable (use `AnimationController`, `StatefulWidget`, gesture detectors, mouse regions for hover, etc.).\n- **CRITICAL LINT RULES:**\n  - **No `dynamic` calls:** If parsing a list of maps, cast explicitly: `final name = ((item as Map<String, dynamic>)['name'] as String?) ?? 'Default';`. Do not call `item['name']` if `item` is typed as `dynamic`.\n  - **No deprecated methods:** NEVER use `Color.withOpacity(x)`. Use `Color.withValues(alpha: x)` instead.\n  - **No single-line ifs without braces:** Always use curly braces for if-statements: `if (condition) { return ...; }`.\n  - **Loops:** Always use `final` in loops: `for (final item in items) { ... }`.\n  - **Const:** Use `const` literals appropriately for `BoxShadow`, `EdgeInsets`, etc.\n\n### 2. Integration\n\nIntegrate the component into the appropriate location in the app.\n\n- Parse app data from the FastAPI backend defensively using `as` casting and null-aware operators (`??`).\n- Ensure the component handles loading, error, and empty states gracefully.\n- Ensure proper disposal of `AnimationController`s and other resources in `dispose()`.\n\n### Output Format\n\nProvide the code in clearly separated markdown blocks. Use the `replace_string_in_file` tool to inject the new code accurately and format imports cleanly.\n\n### 3. Usage Examples\n\nAt the end of your response, provide a list of example scenarios where the new components would be most useful in the VR App Manager workflow.\n\n### 4. Post-Generation\n\nShow me a table with the names of the new components, a brief description of each, and the files that were updated for each component.\nAfter generating and injecting the components, make sure to execute the `fix-build-warnings` prompt to fix any possible compilation errors.\n"
+        }
+    ]
+}

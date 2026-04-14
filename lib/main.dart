@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'db_service.dart';
 
 void main() {
   runApp(const AppManagerApp());
@@ -50,14 +51,12 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _fetchApps() async {
     setState(() => _isLoading = true);
     try {
-      final response = await http.get(Uri.parse('$_apiUrl/apps'));
-      if (response.statusCode == 200) {
-        setState(() {
-          _apps = json.decode(response.body);
-        });
-      }
+      final smbApps = await fetchAppsFromDb("smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db");
+      setState(() {
+        _apps = smbApps;
+      });
     } catch (e) {
-      debugPrint('Error fetching apps: $e');
+      debugPrint('Error fetching apps from DB: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -126,11 +125,11 @@ class _AppCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (app['preview_photo'] != null)
+                    if (app['thumbnail_url'] != null)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.network(
-                          app['preview_photo'],
+                          app['thumbnail_url'],
                           width: 400,
                           height: 250,
                           fit: BoxFit.cover,
@@ -148,7 +147,7 @@ class _AppCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            app['title'] ?? 'Unknown App',
+                            app['name'] ?? 'Unknown App',
                             style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 20),
@@ -159,7 +158,7 @@ class _AppCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              app['category'] ?? 'Category',
+                              app['categories'] ?? 'Category',
                               style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 18),
                             ),
                           ),
@@ -168,7 +167,7 @@ class _AppCard extends StatelessWidget {
                             children: [
                               const Icon(Icons.star, color: Colors.yellow, size: 32),
                               const SizedBox(width: 8),
-                              Text("${app['metacritic_rating'] ?? 0}/100", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white70)),
+                              Text("${app['metacritic_score'] ?? 0}/100", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white70)),
                             ],
                           ),
                         ],
@@ -184,7 +183,7 @@ class _AppCard extends StatelessWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     child: Text(
-                      app['description'] ?? 'No description available.',
+                      app['long_description'] ?? 'No description available.',
                       style: const TextStyle(fontSize: 22, color: Colors.white70, height: 1.6),
                     ),
                   ),
@@ -268,9 +267,9 @@ class _AppCard extends StatelessWidget {
           children: [
             Expanded(
               flex: 5,
-              child: app['preview_photo'] != null
+              child: app['thumbnail_url'] != null
                   ? Image.network(
-                      app['preview_photo'],
+                      app['thumbnail_url'],
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(color: Colors.grey[800]),
                     )
@@ -284,7 +283,7 @@ class _AppCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      app['title'] ?? 'Unknown App',
+                      app['name'] ?? 'Unknown App',
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -297,7 +296,7 @@ class _AppCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        app['category'] ?? '',
+                        app['categories'] ?? '',
                         style: const TextStyle(color: Colors.purpleAccent, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                     ),

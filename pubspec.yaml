@@ -36,6 +36,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   url_launcher: ^6.3.2
+  sqflite: ^2.4.2
+  path_provider: ^2.1.5
+  sqlite3_flutter_libs: ^0.6.0+eol
+  smb_connect: ^0.0.9
+  sqflite_common_ffi: ^2.4.0+2
 
 dev_dependencies:
   flutter_test:

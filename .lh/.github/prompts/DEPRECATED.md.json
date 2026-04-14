@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/DEPRECATED.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703605,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703605,
+            "name": "Commit-0",
+            "content": "# VR App Manager — AI Prompts\n\nThis directory contains GitHub Copilot prompt files (`.prompt.md`) for the **VR App Manager** Flutter project.\n\nThese prompts help automate common development workflows such as:\n\n- Code refactoring and optimization\n- UI component generation\n- Testing and validation\n- Build and deprecation fixes\n- Folder structure checks\n\n## Active Prompts\n\nAll `.prompt.md` files in this directory are active and specific to the VR App Manager project.\n\n## Project Context\n\n- **App**: VR App Manager — a Flutter app for browsing and launching VR applications\n- **Architecture**: Single-file (`lib/main.dart`), `StatefulWidget`/`setState`\n- **Backend**: FastAPI at `http://192.168.1.17:8001/api`\n- **Platforms**: Android, iOS, Web, macOS, Linux, Windows\n"
+        }
+    ]
+}

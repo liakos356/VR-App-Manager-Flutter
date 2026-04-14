@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/folder-structure-check.prompt.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703604,
+            "name": "Commit-0",
+            "content": "---\nagent: agent\n---\n\nHere is a prompt to check, validate, and improve the folder structure of the project.\n\n---\n\nYou are the Lead Flutter Architect for the **VR App Manager** project. Your job is to analyze, validate, and improve the folder structure of the application to ensure it adheres to simple, scalable architecture principles appropriate for this project.\n\n**Goal:**\n\n- Evaluate the current structure of `lib/`.\n- Ensure appropriate separation of concerns as the app grows.\n- Move misplaced code and enforce consistent naming conventions.\n\n**Project Architecture & Rules:**\n\n- **Framework**: Flutter, all platforms (Android, iOS, Web, macOS, Linux, Windows).\n- **Current Structure**: `lib/main.dart` contains all application code.\n- **Target Structure for Growth** (apply only if codebase grows beyond one file):\n  - `lib/screens/` — full-page screen widgets (e.g., `main_screen.dart`)\n  - `lib/widgets/` — reusable components (e.g., `app_card.dart`)\n  - `lib/models/` — data models (e.g., `vr_app.dart`)\n  - `lib/services/` — API/network logic (e.g., `api_service.dart`)\n  - `lib/app.dart` — root `MaterialApp` configuration\n- **State Management**: `StatefulWidget`/`setState`. Do not introduce Riverpod, BLoC, or other frameworks.\n- **No routing library required**: Direct `Navigator` / `MaterialPageRoute` usage is fine.\n- **Imports**: Relative imports inside `lib/`; absolute `package:appmanager/` imports are also acceptable.\n- **Tests**: Ensure the `test/` directory structure mirrors the `lib/` directory structure.\n\n**Instructions:**\n\n1. **Scan the `lib/` & `test/` directory**: Visualize the current depth and organization.\n2. **Identify Anomalies & Anti-Patterns**: Look for:\n   - **Oversized files**: Files with >200 lines that should be split into smaller widgets/helpers.\n   - **Logic in build methods**: Business logic or API calls inline in `build()` that should be extracted.\n   - **Duplicated code**: Repeated patterns that could be extracted into a shared widget or utility.\n3. **Propose a Restructuring Plan**:\n   - Before making changes, output a plan of _File Splits_ and _New Directories_.\n   - Wait for user confirmation if the changes are drastic.\n4. **Execute Refactoring**:\n   - **Reorganize**: Create appropriate folder layers when needed.\n   - **Move**: Relocate code to the correct architectural location.\n   - **Consolidate**: Keep related code together; avoid unnecessary fragmentation.\n5. **Update Imports**: **Crucial**. If you move a file, you MUST find all references to it and update the import paths to ensure the project remains compilable.\n\n**Permissions:**\n\n- You are allowed to move, rename, and create folders/files.\n- You must verify that the new structure is logical and scalable.\n- After moving files, verify imports are updated.\n\nStart by listing the recursive structure of `lib/` to understand the current state, then proceed with the validation and improvements.\n"
+        }
+    ]
+}

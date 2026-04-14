@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".vscode/settings.json",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776161883813,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776161883813,
+            "name": "Commit-0",
+            "content": "{\n    \"workbench.colorCustomizations\": {\n        \"activityBar.activeBackground\": \"#fa1b49\",\n        \"activityBar.background\": \"#fa1b49\",\n        \"activityBar.foreground\": \"#e7e7e7\",\n        \"activityBar.inactiveForeground\": \"#e7e7e799\",\n        \"activityBarBadge.background\": \"#155e02\",\n        \"activityBarBadge.foreground\": \"#e7e7e7\",\n        \"commandCenter.border\": \"#e7e7e799\",\n        \"sash.hoverBorder\": \"#fa1b49\",\n        \"statusBar.background\": \"#dd0531\",\n        \"statusBar.foreground\": \"#e7e7e7\",\n        \"statusBarItem.hoverBackground\": \"#fa1b49\",\n        \"statusBarItem.remoteBackground\": \"#dd0531\",\n        \"statusBarItem.remoteForeground\": \"#e7e7e7\",\n        \"titleBar.activeBackground\": \"#dd0531\",\n        \"titleBar.activeForeground\": \"#e7e7e7\",\n        \"titleBar.inactiveBackground\": \"#dd053199\",\n        \"titleBar.inactiveForeground\": \"#e7e7e799\"\n    }\n}"
+        }
+    ]
+}

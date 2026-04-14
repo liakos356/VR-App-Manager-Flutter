@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".github/prompts/fix-warnings.prompt.md",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776163703604,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776163703604,
+            "name": "Commit-0",
+            "content": "---\nagent: agent\n---\n\nYou are an expert Dart/Flutter Copilot tasked with scanning the entire **VR App Manager** Flutter project for linting warnings and issues.\n\n**Primary Objective:**\n\n1. Run `flutter analyze` (using `analysis_options.yaml` rules and `flutter_lints`) across all Dart files in `lib/`, `test/`.\n2. Identify ALL warnings, errors, and style issues from the Dart/Flutter linter.\n3. Prioritize them by severity:\n   - **Critical (Fix First):** Potential runtime crashes, null safety violations, async issues (e.g., `avoid_unnecessary_type_casts`, `always_declare_return_types`, `use_build_context_synchronously`).\n   - **High:** Performance impacts, security risks (e.g., `prefer_const_constructors`, `avoid_print`, `use_key_in_widget_constructors`).\n   - **Medium:** Maintainability issues (e.g., `avoid_dynamic_calls`, `prefer_final_fields`).\n   - **Low:** Style/formatting (e.g., `prefer_single_quotes`, lines longer than 80 chars).\n\n**Workflow:**\n\n1. List top 10-20 prioritized issues with file paths, exact warning message, line numbers, and severity tag.\n2. For each issue (starting with Critical/High):\n   - Explain the problem briefly.\n   - Provide the exact code fix as a diff or replacement snippet.\n   - Ensure fixes maintain functionality (e.g., preserve `http` API calls, `setState` patterns, `url_launcher` usage).\n3. After fixes, re-run `flutter analyze` and confirm resolution.\n4. Output final clean analysis result (0 warnings).\n5. Suggest running `flutter format .` for auto-formatting.\n\n**Project Context:** Multi-platform (Web/Mobile/Desktop), `StatefulWidget`/`setState` architecture, `http` package for API calls, `url_launcher` for external links. Respect existing patterns like `GridView.builder`, `showDialog`, and the dark theme setup.\n\nFocus only on linting fixes for clean, production-ready code. Output step-by-step with code snippets ready to apply.\n"
+        }
+    ]
+}
