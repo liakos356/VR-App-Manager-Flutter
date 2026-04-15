@@ -1,0 +1,18 @@
+{
+    "sourceFile": "test/widget_test.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776248993757,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776248993757,
+            "name": "Commit-0",
+            "content": "// This is a basic Flutter widget test.\n//\n// To perform an interaction with a widget in your test, use the WidgetTester\n// utility in the flutter_test package. For example, you can send tap and scroll\n// gestures. You can also use WidgetTester to find child widgets in the widget\n// tree, read text, and verify that the values of widget properties are correct.\n\nimport 'package:flutter_test/flutter_test.dart';\n\nimport 'package:appmanager/main.dart';\n\nvoid main() {\n  testWidgets('smoke test', (WidgetTester tester) async {\n    // Build our app and trigger a frame.\n    await tester.pumpWidget(AppManagerApp());\n  });\n}\n"
+        }
+    ]
+}

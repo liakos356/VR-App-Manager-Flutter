@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:dart_smb2/dart_smb2.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -17,12 +18,12 @@ class InstallService {
     if (Platform.isAndroid) {
       onProgress('Requesting permissions...');
       await Permission.requestInstallPackages.request();
-      
+
       if (!await Permission.manageExternalStorage.isGranted) {
         onProgress('Please grant All Files Access in Settings if prompted...');
         await Permission.manageExternalStorage.request();
       }
-      
+
       if (!await Permission.storage.isGranted) {
         await Permission.storage.request();
       }
@@ -46,14 +47,20 @@ class InstallService {
 
       bool apkFound = false;
 
-      Future<bool> _downloadWithProgress(String remotePath, File localFile) async {
+      Future<bool> downloadWithProgress(
+        String remotePath,
+        File localFile,
+      ) async {
         try {
           final exists = await pool!.exists(remotePath);
           if (!exists) return false;
-          
+
           final size = await pool.fileSize(remotePath);
-          final stream = pool.streamFile(remotePath, chunkSize: 1024 * 1024 * 2);
-          
+          final stream = pool.streamFile(
+            remotePath,
+            chunkSize: 1024 * 1024 * 2,
+          );
+
           int downloaded = 0;
           final sink = localFile.openWrite();
           try {
@@ -92,7 +99,7 @@ class InstallService {
       // Try direct apk first using path from DB
       try {
         onProgress('Downloading APK: $relativeApkPath...');
-        apkFound = await _downloadWithProgress(relativeApkPath, apkFile);
+        apkFound = await downloadWithProgress(relativeApkPath, apkFile);
       } catch (e) {
         onProgress('Direct path failed: $e');
       }
@@ -103,7 +110,10 @@ class InstallService {
         );
         try {
           onProgress('Downloading APK...');
-          apkFound = await _downloadWithProgress('downloads\\pico4\\apps\\$appId.apk', apkFile);
+          apkFound = await downloadWithProgress(
+            'downloads\\pico4\\apps\\$appId.apk',
+            apkFile,
+          );
         } catch (e) {
           // Ignore if alternate path not found
         }
@@ -124,7 +134,10 @@ class InstallService {
         for (var f in files) {
           if (f.name.endsWith('.apk')) {
             onProgress('Downloading APK: ${f.name}...');
-            apkFound = await _downloadWithProgress('$folder\\${f.name}', apkFile);
+            apkFound = await downloadWithProgress(
+              '$folder\\${f.name}',
+              apkFile,
+            );
             if (apkFound) break;
           }
         }
@@ -136,7 +149,7 @@ class InstallService {
 
       // Also look for OBB files
       onProgress('Checking OBB...');
-      
+
       // Try reading from the specified obb directory in DB if available
       String relativeObbPath = obbDir;
       if (relativeObbPath.startsWith('/mnt/sda/')) {
@@ -190,12 +203,17 @@ class InstallService {
           }
           final localObbFile = File('${localObbDir.path}/${f.name}');
           try {
-            final success = await _downloadWithProgress('$folderToUse\\${f.name}', localObbFile);
+            final success = await downloadWithProgress(
+              '$folderToUse\\${f.name}',
+              localObbFile,
+            );
             if (!success) {
-               throw Exception('OBB download stream failed for ${f.name}');
+              throw Exception('OBB download stream failed for ${f.name}');
             }
           } catch (e) {
-            throw Exception('Failed to write OBB file. Please ensure storage permissions are granted. Error: $e');
+            throw Exception(
+              'Failed to write OBB file. Please ensure storage permissions are granted. Error: $e',
+            );
           }
         }
       }
