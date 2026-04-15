@@ -28,6 +28,9 @@ Future<List<Map<String, dynamic>>> fetchAppsFromDb(
   );
 
   final directory = await getTemporaryDirectory();
+  if (!await directory.exists()) {
+    await directory.create(recursive: true);
+  }
   final localPath = '${directory.path}/apps.db';
   final localFile = File(localPath);
 
