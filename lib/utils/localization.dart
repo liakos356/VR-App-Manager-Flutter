@@ -7,11 +7,11 @@ String tr(String key) {
   if (!isGreekNotifier.value) return key;
   final Map<String, String> translations = {
     'VR App Manager': 'Διαχειριστής Εφαρμογών VR',
-    'Pico 4 App Manager': 'Διαχειριστής Εφαρμογών Pico 4',
+    'Liako\'s Store': 'Κατάστημα του Λιάκου',
     'Search apps...': 'Αναζήτηση εφαρμογών...',
     'Clear history': 'Καθαρισμός ιστορικού',
+    'Clear filters': 'Καθαρισμός φίλτρων',
     'All Categories': 'Όλες οι Κατηγορίες',
-    'All Tags': 'Όλες οι Ετικέτες',
     'Ovrport Only': 'Μόνο Ovrport',
     'Name (A-Z)': 'Όνομα (Α-Ω)',
     'Name (Z-A)': 'Όνομα (Ω-Α)',

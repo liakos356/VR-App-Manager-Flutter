@@ -18,10 +18,10 @@ class FilterDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       elevation: 2,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(20),
       color: Theme.of(context).cardColor,
       child: Container(
-        height: 40,
+        height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.center,
         child: Row(

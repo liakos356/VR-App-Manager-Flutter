@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776257672103,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776337214594,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -70,13 +70,9 @@\n                 maxScale: 4.0,\n                 child: Image.network(\n                   widget.imageUrls[index],\n                   fit: BoxFit.contain,\n-<<<<<<< Updated upstream\n-                  errorBuilder: (context, error, stackTrace) => const Center(\n-=======\n                   errorBuilder: (_, _, _) => const Center(\n->>>>>>> Stashed changes\n                     child: Icon(\n                       Icons.broken_image,\n                       size: 100,\n                       color: Colors.grey,\n"
                 }
             ],
             "date": 1776257672103,

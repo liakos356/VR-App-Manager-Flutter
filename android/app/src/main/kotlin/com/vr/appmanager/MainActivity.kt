@@ -35,12 +35,27 @@ class MainActivity : FlutterActivity() {
             val file = File(apkPath)
             if (!file.exists()) return false
 
+            val pm = packageManager
+            val info = pm.getPackageArchiveInfo(apkPath, 0)
+            if (info == null) {
+                // The APK is either drastically corrupt, incompletely downloaded, 
+                // or entirely unsupported by the system's package parser (e.g. wrong architecture).
+                return false
+            }
+
             val intent = Intent(Intent.ACTION_VIEW)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             
             // Use FileProvider for correct API 24+ file sharing
             val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val providerUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                // Explicitly grant perms to the package installer to avoid bugs with FLAG_ACTIVITY_NEW_TASK overriding URI grants
+                val resInfoList = pm.queryIntentActivities(intent.apply { setDataAndType(providerUri, "application/vnd.android.package-archive") }, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+                for (resolveInfo in resInfoList) {
+                    val pName = resolveInfo.activityInfo.packageName
+                    context.grantUriPermission(pName, providerUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                }
+                providerUri
             } else {
                 Uri.fromFile(file)
             }

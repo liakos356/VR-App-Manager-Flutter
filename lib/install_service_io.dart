@@ -56,6 +56,13 @@ class InstallService {
           if (!exists) return false;
 
           final size = await pool.fileSize(remotePath);
+          onProgress('Downloading ${localFile.path.split('/').last} ($size bytes)...');
+          
+          if (size == 0) {
+             onProgress('Error: Remote file size is 0 bytes.');
+             return false;
+          }
+
           final stream = pool.streamFile(
             remotePath,
             chunkSize: 1024 * 1024 * 2,
@@ -75,6 +82,15 @@ class InstallService {
             await sink.flush();
             await sink.close();
           }
+          
+          final finalSize = await localFile.length();
+          onProgress('Downloaded $finalSize bytes.');
+          
+          if (size > 0 && finalSize < size) {
+            onProgress('Download incomplete for ${localFile.path}');
+            return false;
+          }
+          
           return true;
         } catch (e) {
           onProgress('Download stream failed: $e');
@@ -90,6 +106,9 @@ class InstallService {
       } else if (relativeApkPath.startsWith('/')) {
         relativeApkPath = relativeApkPath.substring(1);
       }
+      if (relativeApkPath.startsWith('ssd_internal/')) {
+        relativeApkPath = relativeApkPath.substring('ssd_internal/'.length);
+      }
 
       // Ensure we use backslashes for SMB paths just in case
       relativeApkPath = relativeApkPath.replaceAll('/', '\\');
@@ -97,11 +116,13 @@ class InstallService {
       onProgress('Trying direct path: $relativeApkPath');
 
       // Try direct apk first using path from DB
-      try {
-        onProgress('Downloading APK: $relativeApkPath...');
-        apkFound = await downloadWithProgress(relativeApkPath, apkFile);
-      } catch (e) {
-        onProgress('Direct path failed: $e');
+      if (relativeApkPath.isNotEmpty) {
+        try {
+          onProgress('Downloading APK: $relativeApkPath...');
+          apkFound = await downloadWithProgress(relativeApkPath, apkFile);
+        } catch (e) {
+          onProgress('Direct path failed: $e');
+        }
       }
 
       if (!apkFound) {
@@ -127,11 +148,13 @@ class InstallService {
         List<dynamic> files = [];
         try {
           files = await pool.listDirectory(folder);
+          onProgress('Found folder $folder, contains ${files.length} items');
         } catch (e) {
-          // Ignore if folder not found
+          onProgress('Folder $folder not found or error: $e');
         }
 
         for (var f in files) {
+          onProgress('Inspecting ${f.name} in folder...');
           if (f.name.endsWith('.apk')) {
             onProgress('Downloading APK: ${f.name}...');
             apkFound = await downloadWithProgress(
@@ -225,7 +248,8 @@ class InstallService {
       if (result == true) {
         onProgress('Installation Started!');
       } else {
-        throw Exception('Installation Intent Failed');
+        throw Exception(
+            'Installation Intent Failed: The APK might be corrupt, incompletely downloaded, or its CPU architecture (e.g. arm64) is not supported by this device (e.g. x86_64 Emulator).');
       }
     } catch (e) {
       throw Exception('Install Error: $e');

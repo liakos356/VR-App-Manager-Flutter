@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776257672101,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776337359467,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -17,12 +17,12 @@\n   @override\n   Widget build(BuildContext context) {\n     return Material(\n       elevation: 2,\n-      borderRadius: BorderRadius.circular(12),\n+      borderRadius: BorderRadius.circular(20),\n       color: Theme.of(context).cardColor,\n       child: Container(\n-        height: 40,\n+        height: 44,\n         padding: const EdgeInsets.symmetric(horizontal: 16),\n         alignment: Alignment.center,\n         child: Row(\n           mainAxisSize: MainAxisSize.min,\n"
                 }
             ],
             "date": 1776257672101,

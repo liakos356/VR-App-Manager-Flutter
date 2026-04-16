@@ -13,9 +13,9 @@
         android:usesCleartextTraffic="true"
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
-        android:label="Liakos VR App Store"
+        android:label="Liako's Shop"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"

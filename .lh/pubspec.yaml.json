@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776173036219,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776329316629,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -43,8 +43,10 @@\n   dart_smb2: ^0.0.5\n   flutter_html: ^3.0.0\n   auto_size_text: ^3.0.0\n   youtube_player_iframe: ^5.2.2\n+  shared_preferences: ^2.5.5\n+  permission_handler: ^12.0.1\n \n dev_dependencies:\n   flutter_test:\n     sdk: flutter\n@@ -55,8 +57,11 @@\n   # package. See that file for information about deactivating specific lint\n   # rules and activating additional ones.\n   flutter_lints: ^6.0.0\n   flutter_launcher_icons: ^0.14.4\n+  dependency_validator: ^5.0.5\n+  integration_test:\n+    sdk: flutter\n \n # For information on the generic Dart part of this file, see the\n # following page: https://dart.dev/tools/pub/pubspec\n \n@@ -67,11 +72,10 @@\n   # the material Icons class.\n   uses-material-design: true\n \n   # To add assets to your application, add an assets section, like this:\n-  # assets:\n-  #   - images/a_dot_burr.jpeg\n-  #   - images/a_dot_ham.jpeg\n+  assets:\n+    - assets/app_icon.png\n \n   # An image asset can refer to one or more resolution-specific \"variants\", see\n   # https://flutter.dev/to/resolution-aware-images\n \n@@ -97,10 +101,17 @@\n   #\n   # For details regarding fonts from package dependencies,\n   # see https://flutter.dev/to/font-from-package\n \n-flutter_icons:\n-  android: true\n+flutter_launcher_icons:\n+  android: \"launcher_icon\"\n   ios: true\n-  image_path: \"assets/icon.png\"\n-  adaptive_icon_background: \"#4e3371\"\n-  adaptive_icon_foreground: \"assets/icon.png\"\n+  image_path: \"assets/app_icon.png\"\n+  macos:\n+    generate: true\n+    image_path: \"assets/app_icon.png\"\n+  web:\n+    generate: true\n+    image_path: \"assets/app_icon.png\"\n+  windows:\n+    generate: true\n+    image_path: \"assets/app_icon.png\"\n"
                 }
             ],
             "date": 1776173036219,
