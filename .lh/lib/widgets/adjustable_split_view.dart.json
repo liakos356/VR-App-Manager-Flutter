@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/adjustable_split_view.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776341159409,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776341159409,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nclass AdjustableSplitView extends StatefulWidget {\n  final Widget left;\n  final Widget right;\n  final double initialLeftWidthPercentage;\n\n  const AdjustableSplitView({\n    super.key,\n    required this.left,\n    required this.right,\n    this.initialLeftWidthPercentage = 0.35,\n  });\n\n  @override\n  State<AdjustableSplitView> createState() => _AdjustableSplitViewState();\n}\n\nclass _AdjustableSplitViewState extends State<AdjustableSplitView> {\n  late double _leftWidthPercentage;\n\n  @override\n  void initState() {\n    super.initState();\n    _leftWidthPercentage = widget.initialLeftWidthPercentage;\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return LayoutBuilder(\n      builder: (context, constraints) {\n        final totalWidth = constraints.maxWidth;\n        final leftWidth = totalWidth * _leftWidthPercentage;\n\n        return Row(\n          children: [\n            SizedBox(width: leftWidth, child: widget.left),\n            GestureDetector(\n              behavior: HitTestBehavior.translucent,\n              onHorizontalDragUpdate: (details) {\n                setState(() {\n                  double newPercentage =\n                      _leftWidthPercentage + (details.delta.dx / totalWidth);\n                  _leftWidthPercentage = newPercentage.clamp(0.2, 0.8);\n                });\n              },\n              child: Container(\n                width: 8,\n                color: Colors.transparent,\n                child: Center(\n                  child: Container(\n                    width: 2,\n                    height: 40,\n                    decoration: BoxDecoration(\n                      color: Theme.of(context).dividerColor,\n                      borderRadius: BorderRadius.circular(2),\n                    ),\n                  ),\n                ),\n              ),\n            ),\n            Expanded(child: widget.right),\n          ],\n        );\n      },\n    );\n  }\n}\n"
+        }
+    ]
+}

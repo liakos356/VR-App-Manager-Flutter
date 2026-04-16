@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../db_service.dart';
 import '../utils/formatters.dart';
 import '../utils/localization.dart';
+import '../widgets/adjustable_split_view.dart';
 import '../widgets/app_card.dart';
+import '../widgets/app_detail_panel.dart';
 import '../widgets/filter_dropdown.dart';
 
 class MainScreen extends StatefulWidget {
@@ -26,7 +28,10 @@ class MainScreenState extends State<MainScreen> {
   String _sortOption = 'Name (A-Z)';
   String _categoryFilter = 'All Categories';
   bool _ovrportFilter = false;
-  String _typeFilter = 'All';
+  String _typeFilter = 'all';
+
+  String _viewMode = 'grid'; // 'grid' or 'master_detail'
+  int _selectedMasterDetailIndex = 0;
 
   List<String> _searchHistory = [];
   final SearchController _searchController = SearchController();
@@ -131,6 +136,44 @@ class MainScreenState extends State<MainScreen> {
     return sortedList;
   }
 
+  int _getCategoryCount(String category) {
+    if (category == 'All Categories') return _apps.length;
+    int count = 0;
+    final catLower = category.toLowerCase();
+    for (var app in _apps) {
+      final catString =
+          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
+              .toString()
+              .toLowerCase();
+      if (catString.isNotEmpty) {
+        final splits = catString.split(',');
+        for (var c in splits) {
+          if (c.trim() == catLower) {
+            count++;
+            break; // A single app shouldn't be counted twice for the same category
+          }
+        }
+      }
+    }
+    return count;
+  }
+
+  List<String> get _availableAppTypes {
+    final types = _apps
+        .map((app) {
+          final type = app['app_type']?.toString().toLowerCase();
+          if (type != null && type.isNotEmpty) {
+            return type;
+          }
+          // Fallback if not specified
+          return 'app';
+        })
+        .toSet()
+        .toList();
+    types.sort();
+    return types;
+  }
+
   List<dynamic> get _filteredAndSortedApps {
     List<dynamic> filtered = _apps.where((app) {
       final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
@@ -164,10 +207,8 @@ class MainScreenState extends State<MainScreen> {
               app['ovrport'] == '1' ||
               app['ovrport'] == 'true');
 
-      final matchesType =
-          _typeFilter == 'All' ||
-          (_typeFilter == 'Games' && category.contains('game')) ||
-          (_typeFilter == 'Apps' && !category.contains('game'));
+      final String appType = app['app_type']?.toString().toLowerCase() ?? 'app';
+      final matchesType = _typeFilter == 'all' || _typeFilter == appType;
 
       return matchesSearch && matchesCategory && matchesOvrport && matchesType;
     }).toList();
@@ -233,26 +274,33 @@ class MainScreenState extends State<MainScreen> {
                   ),
                   segments: [
                     ButtonSegment(
-                      value: 'All',
+                      value: 'all',
                       icon: Tooltip(
                         message: tr('All'),
                         child: Icon(Icons.apps),
                       ),
                     ),
-                    ButtonSegment(
-                      value: 'Games',
-                      icon: Tooltip(
-                        message: tr('Games'),
-                        child: Icon(Icons.sports_esports),
-                      ),
-                    ),
-                    ButtonSegment(
-                      value: 'Apps',
-                      icon: Tooltip(
-                        message: tr('Apps'),
-                        child: Icon(Icons.developer_board),
-                      ),
-                    ),
+                    ..._availableAppTypes.map((type) {
+                      IconData iconData;
+                      String titleStr;
+                      if (type == 'game') {
+                        iconData = Icons.sports_esports;
+                        titleStr = 'Games';
+                      } else if (type == 'app') {
+                        iconData = Icons.developer_board;
+                        titleStr = 'Apps';
+                      } else {
+                        iconData = Icons.extension;
+                        titleStr = type[0].toUpperCase() + type.substring(1);
+                      }
+                      return ButtonSegment(
+                        value: type,
+                        icon: Tooltip(
+                          message: tr(titleStr),
+                          child: Icon(iconData),
+                        ),
+                      );
+                    }),
                   ],
                   selected: {_typeFilter},
                   onSelectionChanged: (Set<String> newSelection) {
@@ -414,9 +462,14 @@ class MainScreenState extends State<MainScreen> {
                       value: _categoryFilter,
                       icon: Icons.category,
                       items: _availableCategories.map((String category) {
+                        int count = _getCategoryCount(category);
                         return DropdownMenuItem<String>(
                           value: category,
-                          child: Text(category),
+                          child: Text(
+                            category == 'All Categories'
+                                ? category
+                                : '$category ($count)',
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -447,6 +500,40 @@ class MainScreenState extends State<MainScreen> {
                       ],
                     ),
                     Spacer(),
+                    SegmentedButton<String>(
+                      style: SegmentedButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).primaryColor.withAlpha(20),
+                        selectedBackgroundColor: Theme.of(
+                          context,
+                        ).primaryColor.withAlpha(40),
+                        selectedForegroundColor: Theme.of(context).primaryColor,
+                      ),
+                      segments: [
+                        ButtonSegment(
+                          value: 'grid',
+                          icon: Tooltip(
+                            message: tr('Grid View'),
+                            child: Icon(Icons.grid_view),
+                          ),
+                        ),
+                        ButtonSegment(
+                          value: 'master_detail',
+                          icon: Tooltip(
+                            message: tr('Master Detail'),
+                            child: Icon(Icons.vertical_split),
+                          ),
+                        ),
+                      ],
+                      selected: {_viewMode},
+                      onSelectionChanged: (Set<String> newSelection) {
+                        setState(() {
+                          _viewMode = newSelection.first;
+                        });
+                      },
+                    ),
+                    SizedBox(width: 16),
                     FilterDropdown(
                       value: _sortOption,
                       icon: Icons.sort,
@@ -561,6 +648,14 @@ class MainScreenState extends State<MainScreen> {
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
+                    if (_viewMode == 'master_detail') {
+                      return _buildMasterDetailView(
+                        context,
+                        constraints,
+                        displayedApps,
+                      );
+                    }
+
                     int crossAxisCount = constraints.maxWidth > 1200
                         ? 5
                         : constraints.maxWidth > 800
@@ -588,6 +683,106 @@ class MainScreenState extends State<MainScreen> {
                 ),
         );
       },
+    );
+  }
+
+  Widget _buildMasterDetailView(
+    BuildContext context,
+    BoxConstraints constraints,
+    List<dynamic> displayedApps,
+  ) {
+    if (displayedApps.isEmpty) {
+      return Center(child: Text(tr('No apps found')));
+    }
+
+    if (_selectedMasterDetailIndex >= displayedApps.length) {
+      _selectedMasterDetailIndex = 0;
+    }
+
+    final selectedApp = displayedApps[_selectedMasterDetailIndex];
+
+    return AdjustableSplitView(
+      left: ListView.separated(
+        padding: EdgeInsets.all(16),
+        itemCount: displayedApps.length,
+        separatorBuilder: (context, index) => SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final app = displayedApps[index];
+          final isSelected = index == _selectedMasterDetailIndex;
+
+          final isGreek = isGreekNotifier.value;
+          final desc = isGreek
+              ? (app['short_description_gr'] ?? app['description'] ?? '')
+              : (app['short_description'] ?? app['description'] ?? '');
+
+          final imgUrl = app['thumbnail_url'] ?? app['preview_photo'];
+
+          return ListTile(
+            selected: isSelected,
+            selectedTileColor: Theme.of(context).primaryColor.withAlpha(25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: app['image'] != null
+                  ? Image.network(
+                      '$_apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => Container(
+                        width: 64,
+                        height: 64,
+                        color: Colors.grey.withAlpha(51),
+                        child: Icon(Icons.videogame_asset),
+                      ),
+                    )
+                  : imgUrl != null
+                  ? Image.network(
+                      imgUrl,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => Container(
+                        width: 64,
+                        height: 64,
+                        color: Colors.grey.withAlpha(51),
+                        child: Icon(Icons.videogame_asset),
+                      ),
+                    )
+                  : Container(
+                      width: 64,
+                      height: 64,
+                      color: Colors.grey.withAlpha(51),
+                      child: Icon(Icons.videogame_asset),
+                    ),
+            ),
+            title: Text(
+              app['name'] ?? app['title'] ?? 'Unknown',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              desc,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13),
+            ),
+            onTap: () {
+              setState(() {
+                _selectedMasterDetailIndex = index;
+              });
+            },
+          );
+        },
+      ),
+      right: AppDetailPanel(app: selectedApp, apiUrl: _apiUrl),
     );
   }
 }
