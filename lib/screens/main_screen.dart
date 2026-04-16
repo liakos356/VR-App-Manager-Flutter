@@ -214,21 +214,20 @@ class MainScreenState extends State<MainScreen> {
     }).toList();
 
     filtered.sort((a, b) {
+      final nameA = (a['name'] ?? a['title'] ?? '').toString().toLowerCase();
+      final nameB = (b['name'] ?? b['title'] ?? '').toString().toLowerCase();
+
       if (_sortOption == 'Name (A-Z)') {
-        return (a['name'] ?? '').toString().compareTo(
-          (b['name'] ?? '').toString(),
-        );
+        return nameA.compareTo(nameB);
       } else if (_sortOption == 'Name (Z-A)') {
-        return (b['name'] ?? '').toString().compareTo(
-          (a['name'] ?? '').toString(),
-        );
+        return nameB.compareTo(nameA);
       } else if (_sortOption == 'Rating (High to Low)') {
-        final scoreA = parseRating(a['user_rating']);
-        final scoreB = parseRating(b['user_rating']);
+        final scoreA = parseRating(a['user_rating'] ?? a['rating']);
+        final scoreB = parseRating(b['user_rating'] ?? b['rating']);
         return scoreB.compareTo(scoreA);
       } else if (_sortOption == 'Rating (Low to High)') {
-        final scoreA = parseRating(a['user_rating']);
-        final scoreB = parseRating(b['user_rating']);
+        final scoreA = parseRating(a['user_rating'] ?? a['rating']);
+        final scoreB = parseRating(b['user_rating'] ?? b['rating']);
         return scoreA.compareTo(scoreB);
       } else if (_sortOption == 'Size (Large to Small)') {
         final sizeA = getAppSize(a);
