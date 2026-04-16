@@ -1,0 +1,22 @@
+{
+    "sourceFile": "lib/screens/installed_apps_screen.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 1,
+            "patches": [
+                {
+                    "date": 1776346485516,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776348577139,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -58,9 +58,9 @@\n         return ListTile(\n           leading: app.icon != null\n               ? Image.memory(app.icon!, width: 48, height: 48)\n               : const Icon(Icons.android, size: 48),\n-          title: Text(app.name ?? \"Unknown App\"),\n+          title: Text(app.name),\n           subtitle: Text(\"${app.packageName}\\nversion: ${app.versionName}\"),\n           isThreeLine: true,\n           trailing: IconButton(\n             icon: const Icon(Icons.launch),\n"
+                }
+            ],
+            "date": 1776346485516,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\nimport 'package:installed_apps/app_info.dart';\nimport 'package:installed_apps/installed_apps.dart';\n\nclass InstalledAppsScreen extends StatefulWidget {\n  const InstalledAppsScreen({super.key});\n\n  @override\n  State<InstalledAppsScreen> createState() => _InstalledAppsScreenState();\n}\n\nclass _InstalledAppsScreenState extends State<InstalledAppsScreen> {\n  List<AppInfo> _installedApps = [];\n  bool _isLoading = true;\n\n  @override\n  void initState() {\n    super.initState();\n    _loadInstalledApps();\n  }\n\n  Future<void> _loadInstalledApps() async {\n    setState(() {\n      _isLoading = true;\n    });\n    try {\n      List<AppInfo> apps = await InstalledApps.getInstalledApps(\n        excludeSystemApps: true,\n        withIcon: true,\n      );\n\n      setState(() {\n        _installedApps = apps;\n        _isLoading = false;\n      });\n    } catch (e) {\n      setState(() {\n        _isLoading = false;\n      });\n      debugPrint('Error loading installed apps: $e');\n    }\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    if (_isLoading) {\n      return const Center(child: CircularProgressIndicator());\n    }\n\n    if (_installedApps.isEmpty) {\n      return const Center(child: Text(\"No user installed apps found.\"));\n    }\n\n    return ListView.builder(\n      itemCount: _installedApps.length,\n      itemBuilder: (context, index) {\n        final app = _installedApps[index];\n        return ListTile(\n          leading: app.icon != null\n              ? Image.memory(app.icon!, width: 48, height: 48)\n              : const Icon(Icons.android, size: 48),\n          title: Text(app.name ?? \"Unknown App\"),\n          subtitle: Text(\"${app.packageName}\\nversion: ${app.versionName}\"),\n          isThreeLine: true,\n          trailing: IconButton(\n            icon: const Icon(Icons.launch),\n            onPressed: () {\n              InstalledApps.startApp(app.packageName);\n            },\n            tooltip: 'Launch App',\n          ),\n        );\n      },\n    );\n  }\n}\n"
+        }
+    ]
+}

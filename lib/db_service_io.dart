@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 Future<List<Map<String, dynamic>>> fetchAppsFromDb(
   String smbUrl, {
   void Function(double)? onProgress,
+  bool forceRefresh = false,
 }) async {
   final uri = Uri.parse(smbUrl);
   final host = uri.host.isNotEmpty ? uri.host : "100.95.32.89";
@@ -39,32 +40,44 @@ Future<List<Map<String, dynamic>>> fetchAppsFromDb(
     final int totalSize = stat.size;
     final int chunkSize = 1024 * 1024; // 1 MB chunks
 
-    if (totalSize > 0) {
-      if (onProgress != null) onProgress(0.0);
-      int downloaded = 0;
-      final sink = localFile.openWrite();
-      try {
-        while (downloaded < totalSize) {
-          final int length = (totalSize - downloaded < chunkSize)
-              ? (totalSize - downloaded)
-              : chunkSize;
-          final chunk = await pool.readFileRange(
-            relativePath,
-            offset: downloaded,
-            length: length,
-          );
-          sink.add(chunk);
-          downloaded += chunk.length;
-          if (onProgress != null) onProgress(downloaded / totalSize);
+    bool needsDownload = true;
+    if (!forceRefresh && await localFile.exists()) {
+      final localStat = await localFile.stat();
+      if (localStat.size == totalSize) {
+        needsDownload = false;
+      }
+    }
+
+    if (needsDownload) {
+      if (totalSize > 0) {
+        if (onProgress != null) onProgress(0.0);
+        int downloaded = 0;
+        final sink = localFile.openWrite();
+        try {
+          while (downloaded < totalSize) {
+            final int length = (totalSize - downloaded < chunkSize)
+                ? (totalSize - downloaded)
+                : chunkSize;
+            final chunk = await pool.readFileRange(
+              relativePath,
+              offset: downloaded,
+              length: length,
+            );
+            sink.add(chunk);
+            downloaded += chunk.length;
+            if (onProgress != null) onProgress(downloaded / totalSize);
+          }
+        } finally {
+          await sink.flush();
+          await sink.close();
         }
-      } finally {
-        await sink.flush();
-        await sink.close();
+      } else {
+        if (onProgress != null) onProgress(-1.0); // Indeterminate
+        final data = await pool.readFile(relativePath);
+        await localFile.writeAsBytes(data);
+        if (onProgress != null) onProgress(1.0);
       }
     } else {
-      if (onProgress != null) onProgress(-1.0); // Indeterminate
-      final data = await pool.readFile(relativePath);
-      await localFile.writeAsBytes(data);
       if (onProgress != null) onProgress(1.0);
     }
   } catch (e) {

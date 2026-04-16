@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:installed_apps/installed_apps.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../install_service.dart';
@@ -12,6 +12,7 @@ import '../utils/localization.dart';
 import 'fullscreen_image_viewer.dart';
 import 'star_rating.dart';
 import 'trailer_dialog.dart';
+import 'video_dialog.dart';
 
 class AppCard extends StatefulWidget {
   final dynamic app;
@@ -29,13 +30,115 @@ class AppCard extends StatefulWidget {
   State<AppCard> createState() => AppCardState();
 }
 
-class AppCardState extends State<AppCard> {
+class AppCardState extends State<AppCard> with WidgetsBindingObserver {
   bool _isHovered = false;
   int _currentImageIndex = 0;
 
   bool _isInstalling = false;
   double _installProgress = 0.0;
   String _installStatusStr = 'Starting...';
+
+  bool _isInstalled = false;
+  String _installedPackageName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkIsInstalled();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkIsInstalled();
+    }
+  }
+
+  Future<void> _checkIsInstalled() async {
+    try {
+      final installedAppsList = await InstalledApps.getInstalledApps(
+        excludeSystemApps: false,
+        excludeNonLaunchableApps: false,
+      );
+      bool found = false;
+      String foundPackage = '';
+
+      final String rawTitle = widget.app['title']?.toString() ?? '';
+      final String apkPath =
+          widget.app['file_path_apk']?.toString().toLowerCase() ?? '';
+      final String title = rawTitle.toLowerCase();
+      final String id = widget.app['id']?.toString().toLowerCase() ?? '';
+      final String package =
+          widget.app['package_name']?.toString().toLowerCase() ?? '';
+
+      final is4xvr = title.contains('4xvr') || title.contains('4x vr');
+      if (is4xvr) {
+        print('====== DEBUG 4XVR ======');
+        print('Title: $rawTitle');
+        print('ID: $id');
+        print('Package in DB: $package');
+        print('APK Path: $apkPath');
+      }
+
+      for (var a in installedAppsList) {
+        if (a.packageName.isNotEmpty) {
+          final String pkgName = a.packageName.trim().toLowerCase();
+
+          // Fuzzy matching strips non-alphabet characters
+          final regex = RegExp(r'[^a-zA-Z]');
+          final cleanTitle = title.replaceAll(regex, '');
+          final cleanPkg = pkgName
+              .replaceAll('com.', '')
+              .replaceAll('org.', '')
+              .replaceAll('net.', '')
+              .replaceAll('co.', '')
+              .replaceAll(regex, '');
+
+          final titleMatch =
+              cleanTitle.isNotEmpty &&
+              cleanPkg.isNotEmpty &&
+              (cleanTitle.contains(cleanPkg) || cleanPkg.contains(cleanTitle));
+
+          if (apkPath.contains(pkgName) ||
+              id == pkgName ||
+              id.contains(pkgName) ||
+              package == pkgName ||
+              package.contains(pkgName) ||
+              a.name.toLowerCase().contains(title) ||
+              titleMatch) {
+            found = true;
+            foundPackage = a.packageName.trim();
+            if (is4xvr)
+              print('>>> MATCH FOUND: ${a.packageName} (name: ${a.name})');
+            break;
+          }
+
+          if (is4xvr && pkgName.contains('vr')) {
+            // Print out any VR-related app names to see if it's returning from OS
+            // print('   Candidate VR pkg: $pkgName | App Name: ${a.name}');
+          }
+        }
+      }
+
+      if (is4xvr) print('====== 4XVR INSTALLED: $found ======');
+
+      if (mounted) {
+        setState(() {
+          _isInstalled = found;
+          if (foundPackage.isNotEmpty) {
+            _installedPackageName = foundPackage;
+          }
+        });
+      }
+    } catch (_) {}
+  }
 
   List<String> get _allImages {
     final images = <String>[];
@@ -121,7 +224,9 @@ class AppCardState extends State<AppCard> {
                         decoration: BoxDecoration(
                           color: isInstallingLocal
                               ? Colors.grey.shade800
-                              : Colors.green.shade600,
+                              : (_isInstalled
+                                    ? Colors.red.shade600
+                                    : Colors.green.shade600),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Stack(
@@ -143,6 +248,24 @@ class AppCardState extends State<AppCard> {
                                 onTap: isInstallingLocal
                                     ? null
                                     : () async {
+                                        if (_isInstalled) {
+                                          if (_installedPackageName
+                                              .isNotEmpty) {
+                                            try {
+                                              await InstalledApps.uninstallApp(
+                                                _installedPackageName,
+                                              );
+                                              await Future.delayed(
+                                                const Duration(seconds: 1),
+                                              );
+                                              _checkIsInstalled();
+                                              if (context.mounted) {
+                                                Navigator.pop(context);
+                                              }
+                                            } catch (_) {}
+                                          }
+                                          return;
+                                        }
                                         final String appId =
                                             widget.app['id']?.toString() ?? '';
                                         if (appId.isEmpty) {
@@ -231,6 +354,8 @@ class AppCardState extends State<AppCard> {
                                                   installProgressLocal < 1.0
                                               ? '${(installProgressLocal * 100).toInt()}%'
                                               : installStatusLocal
+                                        : _isInstalled
+                                        ? 'Uninstall'
                                         : 'Install',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -505,7 +630,11 @@ class AppCardState extends State<AppCard> {
                                 decoration: BoxDecoration(
                                   color: _isInstalling
                                       ? Colors.grey.shade800
-                                      : Theme.of(context).colorScheme.primary,
+                                      : (_isInstalled
+                                            ? Colors.red.shade600
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.primary),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: Stack(
@@ -535,6 +664,23 @@ class AppCardState extends State<AppCard> {
                                         onTap: _isInstalling
                                             ? null
                                             : () async {
+                                                if (_isInstalled) {
+                                                  if (_installedPackageName
+                                                      .isNotEmpty) {
+                                                    try {
+                                                      await InstalledApps.uninstallApp(
+                                                        _installedPackageName,
+                                                      );
+                                                      await Future.delayed(
+                                                        const Duration(
+                                                          seconds: 1,
+                                                        ),
+                                                      );
+                                                      _checkIsInstalled();
+                                                    } catch (_) {}
+                                                  }
+                                                  return;
+                                                }
                                                 final String appId =
                                                     widget.app['id']
                                                         ?.toString() ??
@@ -662,6 +808,8 @@ class AppCardState extends State<AppCard> {
                                                                     1.0
                                                             ? '${(_installProgress * 100).toInt()}%'
                                                             : _installStatusStr
+                                                      : _isInstalled
+                                                      ? tr('Uninstall')
                                                       : tr('Install'),
                                                   style: TextStyle(
                                                     fontSize: 20,
@@ -709,25 +857,12 @@ class AppCardState extends State<AppCard> {
                                         builder: (context) =>
                                             TrailerDialog(videoId: videoId),
                                       );
-                                    } else {
-                                      final url = Uri.parse(urlString);
-                                      try {
-                                        await launchUrl(
-                                          url,
-                                          mode: LaunchMode.inAppWebView,
-                                        );
-                                      } catch (e) {
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              tr('Could not launch trailer'),
-                                            ),
-                                          ),
-                                        );
-                                      }
+                                    } else if (context.mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) =>
+                                            VideoDialog(videoUrl: urlString),
+                                      );
                                     }
                                   },
                                   icon: const Icon(

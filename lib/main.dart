@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'screens/main_screen.dart';
+import 'screens/home_screen.dart';
 import 'utils/localization.dart';
 
 void main() async {
@@ -46,7 +46,9 @@ class AppManagerApp extends StatelessWidget {
             ),
           ),
           darkTheme: ThemeData.dark().copyWith(
-            scaffoldBackgroundColor: const Color(0xFF1E1E1E), // Darker background
+            scaffoldBackgroundColor: const Color(
+              0xFF1E1E1E,
+            ), // Darker background
             cardColor: const Color(0xFF2D2D30), // Slightly lighter for cards
             appBarTheme: const AppBarTheme(
               backgroundColor: Color(0xFF252526), // VS Code like top bar
@@ -78,7 +80,7 @@ class AppManagerApp extends StatelessWidget {
               hintStyle: const TextStyle(color: Colors.white54),
             ),
           ),
-          home: const MainScreen(),
+          home: const HomeScreen(),
         );
       },
     );

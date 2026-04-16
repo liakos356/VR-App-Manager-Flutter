@@ -84,7 +84,7 @@ class MainScreenState extends State<MainScreen> {
     });
   }
 
-  Future<void> _fetchApps() async {
+  Future<void> _fetchApps({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _downloadProgress = -1.0;
@@ -92,6 +92,7 @@ class MainScreenState extends State<MainScreen> {
     try {
       final smbApps = await fetchAppsFromDb(
         "smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db",
+        forceRefresh: forceRefresh,
         onProgress: (progress) {
           setState(() {
             _downloadProgress = progress;
@@ -615,7 +616,7 @@ class MainScreenState extends State<MainScreen> {
               ),
               IconButton(
                 icon: Icon(Icons.refresh),
-                onPressed: _fetchApps,
+                onPressed: () => _fetchApps(forceRefresh: true),
                 tooltip: tr('Refresh Apps'),
               ),
               SizedBox(width: 16),

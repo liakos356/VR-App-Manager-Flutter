@@ -35,22 +35,22 @@ class TrailerDialogState extends State<TrailerDialog> {
       insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1000),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: YoutubePlayer(controller: _controller),
-            ),
-            Positioned(
-              top: -10,
-              right: -10,
-              child: IconButton(
-                icon: const Icon(Icons.cancel, color: Colors.white, size: 36),
-                onPressed: () => Navigator.of(context).pop(),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              YoutubePlayer(controller: _controller),
+              Positioned(
+                top: -10,
+                right: -10,
+                child: IconButton(
+                  icon: const Icon(Icons.cancel, color: Colors.white, size: 36),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

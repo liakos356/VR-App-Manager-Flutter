@@ -1,0 +1,18 @@
+{
+    "sourceFile": "scripts/build_and_copy.sh",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776348577077,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776348577077,
+            "name": "Commit-0",
+            "content": "#!/bin/bash\n\n# Define the source APK path\nAPK_PATH=\"build/app/outputs/flutter-apk/app-release.apk\"\n\n# Define the destination directory\nDEST_DIR=\"/Volumes/ssd_internal/downloads/pico4/store\"\n\necho \"Building Flutter APK (Release)...\"\nif flutter build apk --release; then\n    echo \"Build successful! Copying APK to $DEST_DIR...\"\n    \n    # Create the destination directory if it doesn't exist\n    mkdir -p \"$DEST_DIR\"\n    \n    # Generate timestamp for versioning\n    TIMESTAMP=$(date +\"%Y%m%d_%H%M\")\n    \n    # Copy the APK\n    if cp \"$APK_PATH\" \"$DEST_DIR/${TIMESTAMP}_store.apk\"; then\n        echo \"APK copied successfully!\"\n    else\n        echo \"Failed to copy the APK.\"\n        exit 1\n    fi\nelse\n    echo \"Build failed. Not copying.\"\n    exit 1\nfi\n"
+        }
+    ]
+}

@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776248993757,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776346485566,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -4,14 +4,22 @@\n // utility in the flutter_test package. For example, you can send tap and scroll\n // gestures. You can also use WidgetTester to find child widgets in the widget\n // tree, read text, and verify that the values of widget properties are correct.\n \n+import 'package:appmanager/main.dart';\n+import 'package:flutter/material.dart';\n import 'package:flutter_test/flutter_test.dart';\n \n-import 'package:appmanager/main.dart';\n-\n void main() {\n   testWidgets('smoke test', (WidgetTester tester) async {\n+    // Specify a larger size for the test since the new Row overflows on the default tiny 800x600 test screen\n+    tester.view.physicalSize = const Size(1920, 1080);\n+    tester.view.devicePixelRatio = 1.0;\n+\n     // Build our app and trigger a frame.\n-    await tester.pumpWidget(AppManagerApp());\n+    await tester.pumpWidget(const AppManagerApp());\n+\n+    // reset\n+    addTearDown(tester.view.resetPhysicalSize);\n+    addTearDown(tester.view.resetDevicePixelRatio);\n   });\n }\n"
                 }
             ],
             "date": 1776248993757,

@@ -13,8 +13,11 @@ if flutter build apk --release; then
     # Create the destination directory if it doesn't exist
     mkdir -p "$DEST_DIR"
     
+    # Generate timestamp for versioning
+    TIMESTAMP=$(date +"%Y%m%d_%H%M")
+    
     # Copy the APK
-    if cp "$APK_PATH" "$DEST_DIR/"; then
+    if cp "$APK_PATH" "$DEST_DIR/${TIMESTAMP}_store.apk"; then
         echo "APK copied successfully!"
     else
         echo "Failed to copy the APK."

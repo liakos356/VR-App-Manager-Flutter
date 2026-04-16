@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/screens/home_screen.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776346485515,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776346485515,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nimport 'installed_apps_screen.dart';\nimport 'main_screen.dart';\n\nclass HomeScreen extends StatefulWidget {\n  const HomeScreen({super.key});\n\n  @override\n  State<HomeScreen> createState() => _HomeScreenState();\n}\n\nclass _HomeScreenState extends State<HomeScreen> {\n  int _currentIndex = 0;\n\n  final List<Widget> _pages = const [MainScreen(), InstalledAppsScreen()];\n\n  @override\n  Widget build(BuildContext context) {\n    return Scaffold(\n      body: IndexedStack(index: _currentIndex, children: _pages),\n      bottomNavigationBar: BottomNavigationBar(\n        currentIndex: _currentIndex,\n        onTap: (index) {\n          setState(() {\n            _currentIndex = index;\n          });\n        },\n        items: const [\n          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Store'),\n          BottomNavigationBarItem(\n            icon: Icon(Icons.install_mobile),\n            label: 'Installed Apps',\n          ),\n        ],\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}

@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/video_dialog.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776348576816,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776348576816,
+            "name": "Commit-0",
+            "content": "import 'package:chewie/chewie.dart';\nimport 'package:flutter/material.dart';\nimport 'package:video_player/video_player.dart';\n\nclass VideoDialog extends StatefulWidget {\n  final String videoUrl;\n  const VideoDialog({super.key, required this.videoUrl});\n\n  @override\n  State<VideoDialog> createState() => _VideoDialogState();\n}\n\nclass _VideoDialogState extends State<VideoDialog> {\n  late VideoPlayerController _videoPlayerController;\n  ChewieController? _chewieController;\n\n  @override\n  void initState() {\n    super.initState();\n    _initializePlayer();\n  }\n\n  Future<void> _initializePlayer() async {\n    _videoPlayerController = VideoPlayerController.networkUrl(\n      Uri.parse(widget.videoUrl),\n    );\n\n    try {\n      await _videoPlayerController.initialize();\n      _chewieController = ChewieController(\n        videoPlayerController: _videoPlayerController,\n        autoPlay: true,\n        looping: false,\n        errorBuilder: (context, errorMessage) {\n          return Center(\n            child: Text(\n              errorMessage,\n              style: const TextStyle(color: Colors.white),\n            ),\n          );\n        },\n      );\n    } catch (e) {\n      debugPrint(\"Video init error: $e\");\n    }\n\n    if (mounted) {\n      setState(() {});\n    }\n  }\n\n  @override\n  void dispose() {\n    _videoPlayerController.dispose();\n    _chewieController?.dispose();\n    super.dispose();\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return Dialog(\n      backgroundColor: Colors.transparent,\n      insetPadding: const EdgeInsets.all(20),\n      child: ConstrainedBox(\n        constraints: const BoxConstraints(maxWidth: 1000),\n        child: AspectRatio(\n          aspectRatio: _videoPlayerController.value.isInitialized\n              ? _videoPlayerController.value.aspectRatio\n              : 16 / 9,\n          child: Stack(\n            alignment: Alignment.center,\n            children: [\n              if (_chewieController != null &&\n                  _chewieController!.videoPlayerController.value.isInitialized)\n                Chewie(controller: _chewieController!)\n              else\n                const Center(child: CircularProgressIndicator()),\n              Positioned(\n                top: -10,\n                right: -10,\n                child: IconButton(\n                  icon: const Icon(Icons.cancel, color: Colors.white, size: 36),\n                  onPressed: () => Navigator.of(context).pop(),\n                ),\n              ),\n            ],\n          ),\n        ),\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}

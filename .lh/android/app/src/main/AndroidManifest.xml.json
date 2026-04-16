@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776173030293,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776348577116,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,13 +3,21 @@\n     <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />\n     <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />\n     <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n     <uses-permission android:name=\"android.permission.INTERNET\" />\n+    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />\n+    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />\n+    <uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\" />\n+    <uses-permission android:name=\"android.permission.MANAGE_EXTERNAL_STORAGE\" />\n+    <uses-permission android:name=\"android.permission.QUERY_ALL_PACKAGES\" />\n     <application\n+        android:enableOnBackInvokedCallback=\"true\"\n         android:usesCleartextTraffic=\"true\"\n-        android:label=\"Liakos VR App Store\"\n+        android:largeHeap=\"true\"\n+        android:requestLegacyExternalStorage=\"true\"\n+        android:label=\"Liako's Shop\"\n         android:name=\"${applicationName}\"\n-        android:icon=\"@mipmap/ic_launcher\">\n+        android:icon=\"@mipmap/launcher_icon\">\n         <activity\n             android:name=\".MainActivity\"\n             android:exported=\"true\"\n             android:launchMode=\"singleTop\"\n@@ -35,8 +43,17 @@\n              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->\n         <meta-data\n             android:name=\"flutterEmbedding\"\n             android:value=\"2\" />\n+        <provider\n+            android:name=\"androidx.core.content.FileProvider\"\n+            android:authorities=\"${applicationId}.fileprovider\"\n+            android:exported=\"false\"\n+            android:grantUriPermissions=\"true\">\n+            <meta-data\n+                android:name=\"android.support.FILE_PROVIDER_PATHS\"\n+                android:resource=\"@xml/file_paths\" />\n+        </provider>\n     </application>\n     <!-- Required to query activities that can process text, see:\n          https://developer.android.com/training/package-visibility and\n          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.\n"
                 }
             ],
             "date": 1776173030293,
