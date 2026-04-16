@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 import '../db_service.dart';
+import '../utils/formatters.dart';
+import '../utils/localization.dart';
 import '../widgets/app_card.dart';
 import '../widgets/filter_dropdown.dart';
-import '../utils/localization.dart';
-import '../utils/formatters.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -26,7 +25,6 @@ class MainScreenState extends State<MainScreen> {
   String _searchQuery = '';
   String _sortOption = 'Name (A-Z)';
   String _categoryFilter = 'All Categories';
-  String _tagFilter = 'All Tags';
   bool _ovrportFilter = false;
   String _typeFilter = 'All';
 
@@ -133,41 +131,6 @@ class MainScreenState extends State<MainScreen> {
     return sortedList;
   }
 
-  List<String> get _availableTags {
-    final Set<String> tagsSet = {'All Tags'};
-    for (var app in _apps) {
-      if (app['tags'] != null) {
-        final tagsStr = app['tags'].toString();
-        if (tagsStr.trim().isEmpty) continue;
-
-        try {
-          final List<dynamic> parsed = jsonDecode(tagsStr);
-          for (var t in parsed) {
-            final trimmed = t.toString().trim();
-            if (trimmed.isNotEmpty) {
-              tagsSet.add(trimmed);
-            }
-          }
-        } catch (_) {
-          final splits = tagsStr.replaceAll(RegExp(r'[\[\]"]'), '').split(',');
-          for (var t in splits) {
-            final trimmed = t.trim();
-            if (trimmed.isNotEmpty) {
-              tagsSet.add(trimmed);
-            }
-          }
-        }
-      }
-    }
-    final sortedList = tagsSet.toList();
-    sortedList.sort((a, b) {
-      if (a == 'All Tags') return -1;
-      if (b == 'All Tags') return 1;
-      return a.compareTo(b);
-    });
-    return sortedList;
-  }
-
   List<dynamic> get _filteredAndSortedApps {
     List<dynamic> filtered = _apps.where((app) {
       final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
@@ -178,27 +141,13 @@ class MainScreenState extends State<MainScreen> {
               .toString()
               .toLowerCase();
 
-      bool matchesTag = _tagFilter == 'All Tags';
+      final query = _searchQuery.toLowerCase();
       String allTagsString = '';
       if (app['tags'] != null) {
         final tagsStr = app['tags'].toString();
         allTagsString = tagsStr.toLowerCase();
-        if (!matchesTag) {
-          try {
-            final List<dynamic> parsed = jsonDecode(tagsStr);
-            matchesTag = parsed.any(
-              (tag) => tag.toString().trim() == _tagFilter,
-            );
-          } catch (_) {
-            final splits = tagsStr
-                .replaceAll(RegExp(r'[\[\]"]'), '')
-                .split(',');
-            matchesTag = splits.any((tag) => tag.trim() == _tagFilter);
-          }
-        }
       }
 
-      final query = _searchQuery.toLowerCase();
       final matchesSearch =
           name.contains(query) ||
           category.contains(query) ||
@@ -220,11 +169,7 @@ class MainScreenState extends State<MainScreen> {
           (_typeFilter == 'Games' && category.contains('game')) ||
           (_typeFilter == 'Apps' && !category.contains('game'));
 
-      return matchesSearch &&
-          matchesCategory &&
-          matchesTag &&
-          matchesOvrport &&
-          matchesType;
+      return matchesSearch && matchesCategory && matchesOvrport && matchesType;
     }).toList();
 
     filtered.sort((a, b) {
@@ -272,13 +217,15 @@ class MainScreenState extends State<MainScreen> {
             title: Row(
               children: [
                 Text(
-                  'Pico 4 App Manager (${displayedApps.length})',
+                  "Liako's App Store",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
                 ),
                 SizedBox(width: 16),
                 SegmentedButton<String>(
                   showSelectedIcon: false,
                   style: SegmentedButton.styleFrom(
+                    elevation: 2,
+                    side: BorderSide.none,
                     selectedBackgroundColor: Theme.of(
                       context,
                     ).primaryColor.withAlpha(40),
@@ -324,20 +271,30 @@ class MainScreenState extends State<MainScreen> {
                       viewConstraints: BoxConstraints(maxHeight: 300),
                       builder:
                           (BuildContext context, SearchController controller) {
-                            return TextField(
-                              controller: controller,
-                              onTap: () => controller.openView(),
-                              onChanged: (_) => controller.openView(),
-                              onSubmitted: (value) {
-                                _saveSearchHistory(value);
-                                controller.closeView(value);
-                              },
-                              decoration: InputDecoration(
-                                hintText: 'Search apps...',
-                                prefixIcon: Icon(Icons.search, size: 20),
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: 0,
-                                  horizontal: 16,
+                            return Material(
+                              elevation: 2,
+                              borderRadius: BorderRadius.circular(20),
+                              child: TextField(
+                                controller: controller,
+                                onTap: () => controller.openView(),
+                                onChanged: (_) => controller.openView(),
+                                onSubmitted: (value) {
+                                  _saveSearchHistory(value);
+                                  controller.closeView(value);
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Search apps...',
+                                  prefixIcon: Icon(Icons.search, size: 20),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  filled: true,
+                                  fillColor: Theme.of(context).cardColor,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 0,
+                                    horizontal: 16,
+                                  ),
                                 ),
                               ),
                             );
@@ -471,24 +428,6 @@ class MainScreenState extends State<MainScreen> {
                       },
                     ),
                     SizedBox(width: 16),
-                    FilterDropdown(
-                      value: _tagFilter,
-                      icon: Icons.label,
-                      items: _availableTags.map((String tag) {
-                        return DropdownMenuItem<String>(
-                          value: tag,
-                          child: Text(tag),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _tagFilter = value;
-                          });
-                        }
-                      },
-                    ),
-                    SizedBox(width: 16),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -550,6 +489,15 @@ class MainScreenState extends State<MainScreen> {
               ),
             ),
             actions: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Text(
+                    '(${displayedApps.length})',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
               ValueListenableBuilder<bool>(
                 valueListenable: isGreekNotifier,
                 builder: (context, isGreek, child) {
