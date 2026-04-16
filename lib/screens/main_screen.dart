@@ -28,6 +28,7 @@ class MainScreenState extends State<MainScreen> {
   String _categoryFilter = 'All Categories';
   String _tagFilter = 'All Tags';
   bool _ovrportFilter = false;
+  String _typeFilter = 'All';
 
   List<String> _searchHistory = [];
   final SearchController _searchController = SearchController();
@@ -214,7 +215,16 @@ class MainScreenState extends State<MainScreen> {
               app['ovrport'] == '1' ||
               app['ovrport'] == 'true');
 
-      return matchesSearch && matchesCategory && matchesTag && matchesOvrport;
+      final matchesType =
+          _typeFilter == 'All' ||
+          (_typeFilter == 'Games' && category.contains('game')) ||
+          (_typeFilter == 'Apps' && !category.contains('game'));
+
+      return matchesSearch &&
+          matchesCategory &&
+          matchesTag &&
+          matchesOvrport &&
+          matchesType;
     }).toList();
 
     filtered.sort((a, b) {
@@ -265,7 +275,46 @@ class MainScreenState extends State<MainScreen> {
                   'Pico 4 App Manager (${displayedApps.length})',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
                 ),
-                SizedBox(width: 24),
+                SizedBox(width: 16),
+                SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    selectedBackgroundColor: Theme.of(
+                      context,
+                    ).primaryColor.withAlpha(40),
+                    selectedForegroundColor: Theme.of(context).primaryColor,
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: 'All',
+                      icon: Tooltip(
+                        message: tr('All'),
+                        child: Icon(Icons.apps),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: 'Games',
+                      icon: Tooltip(
+                        message: tr('Games'),
+                        child: Icon(Icons.sports_esports),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: 'Apps',
+                      icon: Tooltip(
+                        message: tr('Apps'),
+                        child: Icon(Icons.developer_board),
+                      ),
+                    ),
+                  ],
+                  selected: {_typeFilter},
+                  onSelectionChanged: (Set<String> newSelection) {
+                    setState(() {
+                      _typeFilter = newSelection.first;
+                    });
+                  },
+                ),
+                SizedBox(width: 16),
                 Expanded(
                   child: SizedBox(
                     height: 40,

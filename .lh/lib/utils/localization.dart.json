@@ -1,0 +1,22 @@
+{
+    "sourceFile": "lib/utils/localization.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 1,
+            "patches": [
+                {
+                    "date": 1776257672100,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776329316628,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -6,13 +6,13 @@\n String tr(String key) {\n   if (!isGreekNotifier.value) return key;\n   final Map<String, String> translations = {\n     'VR App Manager': 'Διαχειριστής Εφαρμογών VR',\n-    'Pico 4 App Manager': 'Διαχειριστής Εφαρμογών Pico 4',\n+    'Liako\\'s Store': 'Κατάστημα του Λιάκου',\n     'Search apps...': 'Αναζήτηση εφαρμογών...',\n     'Clear history': 'Καθαρισμός ιστορικού',\n+    'Clear filters': 'Καθαρισμός φίλτρων',\n     'All Categories': 'Όλες οι Κατηγορίες',\n-    'All Tags': 'Όλες οι Ετικέτες',\n     'Ovrport Only': 'Μόνο Ovrport',\n     'Name (A-Z)': 'Όνομα (Α-Ω)',\n     'Name (Z-A)': 'Όνομα (Ω-Α)',\n     'Rating (High to Low)': 'Βαθμολογία (Φθίνουσα)',\n"
+                }
+            ],
+            "date": 1776257672100,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nfinal ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);\nfinal ValueNotifier<bool> isGreekNotifier = ValueNotifier(false);\n\nString tr(String key) {\n  if (!isGreekNotifier.value) return key;\n  final Map<String, String> translations = {\n    'VR App Manager': 'Διαχειριστής Εφαρμογών VR',\n    'Pico 4 App Manager': 'Διαχειριστής Εφαρμογών Pico 4',\n    'Search apps...': 'Αναζήτηση εφαρμογών...',\n    'Clear history': 'Καθαρισμός ιστορικού',\n    'All Categories': 'Όλες οι Κατηγορίες',\n    'All Tags': 'Όλες οι Ετικέτες',\n    'Ovrport Only': 'Μόνο Ovrport',\n    'Name (A-Z)': 'Όνομα (Α-Ω)',\n    'Name (Z-A)': 'Όνομα (Ω-Α)',\n    'Rating (High to Low)': 'Βαθμολογία (Φθίνουσα)',\n    'Rating (Low to High)': 'Βαθμολογία (Αύξουσα)',\n    'Size (Large to Small)': 'Μέγεθος (Φθίνον)',\n    'Size (Small to Large)': 'Μέγεθος (Αύξον)',\n    'Fetching database...': 'Λήψη βάσης δεδομένων...',\n    'Unknown App': 'Άγνωστη Εφαρμογή',\n    'Category': 'Κατηγορία',\n    'Screenshots': 'Στιγμιότυπα Οθόνης',\n    'Install to Headset': 'Εγκατάσταση στο Headset',\n    'Watch Trailer': 'Προβολή Trailer',\n    'Toggle Theme': 'Εναλλαγή Θέματος',\n    'Refresh Apps': 'Ανανέωση Εφαρμογών',\n    'Cancel': 'Ακύρωση',\n    'Install': 'Εγκατάσταση',\n    'Could not launch trailer': 'Αδυναμία εκκίνησης trailer',\n    'Do you want to send this app to your headset for installation?':\n        'Θέλετε να στείλετε αυτήν την εφαρμογή στο headset για εγκατάσταση;',\n    'Deployment instruction sent to PC via ADB! Check headset for USB Debugging prompt.':\n        'Η εντολή εγκατάστασης εστάλη στο PC μέσω ADB! Ελέγξτε το headset για το μήνυμα USB Debugging.',\n    'Unknown Size': 'Άγνωστο Μέγεθος',\n    'Toggle Language': 'Αλλαγή Γλώσσας',\n    'Install App?': 'Εγκατάσταση Εφαρμογής;',\n    'Done': 'Ολοκλήρωση',\n    'Ovrport': 'Ovrport',\n    'Installation Completed!': 'Η Εγκατάσταση Ολοκληρώθηκε!',\n    'Invalid Object: App ID is empty':\n        'Μη έγκυρο αντικείμενο: Το αναγνωριστικό εφαρμογής είναι κενό',\n  };\n  return translations[key] ?? key;\n}\n"
+        }
+    ]
+}

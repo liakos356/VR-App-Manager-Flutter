@@ -71,7 +71,7 @@ class FullscreenImageViewerState extends State<FullscreenImageViewer> {
                 child: Image.network(
                   widget.imageUrls[index],
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
+                  errorBuilder: (context, error, stackTrace) => const Center(
                     child: Icon(
                       Icons.broken_image,
                       size: 100,

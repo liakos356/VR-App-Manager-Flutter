@@ -1,0 +1,40 @@
+Analyzing VR-App-Manager-Flutter...                             
+
+  error • Expected to find ',' • lib/main_new.dart:29:58 • expected_token
+  error • The argument for the named parameter 'backgroundColor' was already specified • lib/main_new.dart:29:58 • duplicate_named_argument
+  error • Invalid constant value • lib/main_new.dart:29:75 • invalid_constant
+  error • The getter 'whbl' isn't defined for the type 'Colors' • lib/main_new.dart:29:82 • undefined_getter
+  error • Expected to find ',' • lib/main_new.dart:29:100 • expected_token
+  error • The argument for the named parameter 'backgroundColor' was already specified • lib/main_new.dart:29:100 • duplicate_named_argument
+  error • Invalid constant value • lib/main_new.dart:29:117 • invalid_constant
+  error • The getter 'rS' isn't defined for the type 'Colors' • lib/main_new.dart:29:124 • undefined_getter
+  error • Expected to find ',' • lib/main_new.dart:29:140 • expected_token
+  error • The argument for the named parameter 'backgroundColor' was already specified • lib/main_new.dart:29:140 • duplicate_named_argument
+  error • Expected to find ',' • lib/main_new.dart:29:183 • expected_token
+  error • Invalid constant value • lib/main_new.dart:29:183 • invalid_constant
+  error • Too many positional arguments: 0 expected, but 1 found • lib/main_new.dart:29:183 • extra_positional_arguments_could_be_named
+  error • Undefined name 'bars' • lib/main_new.dart:29:183 • undefined_identifier
+  error • Expected to find ')' • lib/main_new.dart:29:219 • expected_token
+  error • Too many positional arguments: 0 expected, but 2 found • lib/main_new.dart:31:13 • extra_positional_arguments_could_be_named
+  error • Undefined name 'inputDecorationTh' • lib/main_new.dart:31:13 • undefined_identifier
+  error • Expected to find ',' • lib/main_new.dart:31:42 • expected_token
+  error • The method 'inputDecorate' isn't defined for the type 'AppManagerApp' • lib/main_new.dart:31:42 • undefined_method
+  error • Undefined name 'fill' • lib/main_new.dart:32:15 • undefined_identifier
+  error • Expected to find ',' • lib/main_new.dart:32:33 • expected_token
+  error • Undefined name 'fill' • lib/main_new.dart:32:33 • undefined_identifier
+  error • Expected to find ',' • lib/main_new.dart:32:51 • expected_token
+  error • Undefined name 'fill' • lib/main_new.dart:32:51 • undefined_identifier
+  error • Expected to find ',' • lib/main_new.dart:32:65 • expected_token
+  error • Undefined name 'e' • lib/main_new.dart:32:65 • undefined_identifier
+  error • The named parameter 'darkTheme' isn't defined • lib/main_new.dart:40:11 • undefined_named_parameter
+  error • The method 'copyWiolor' isn't defined for the type 'ThemeData' • lib/main_new.dart:40:39 • undefined_method
+  error • Arguments of a constant creation must be constant expressions • lib/main_new.dart:43:39 • const_with_non_constant_argument
+  error • Too many positional arguments: 0 expected, but 1 found • lib/main_new.dart:43:39 • extra_positional_arguments_could_be_named
+  error • Undefined name 'xF' • lib/main_new.dart:43:39 • undefined_identifier
+  error • Expected to find ',' • lib/main_new.dart:43:65 • expected_token
+  error • The named parameter 'econdary' isn't defined • lib/main_new.dart:50:1 • undefined_named_parameter
+  error • The method 'ark' isn't defined for the type 'AppManagerApp' • lib/main_new.dart:51:1 • undefined_method
+  error • Too many positional arguments: 0 expected, but 1 found • lib/main_new.dart:51:1 • extra_positional_arguments_could_be_named
+  error • Expected to find ';' • lib/main_new.dart:55:56 • expected_token
+  error • Expected to find ')' • lib/main_new.dart:57:7 • expected_token
+

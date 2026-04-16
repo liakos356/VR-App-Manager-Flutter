@@ -1,0 +1,473 @@
+Index: 
+===================================================================
+--- 
++++ 
+@@ -1,13 +1,12 @@
+ import 'package:flutter/material.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+-import 'dart:convert';
+ 
+ import '../db_service.dart';
++import '../utils/formatters.dart';
++import '../utils/localization.dart';
+ import '../widgets/app_card.dart';
+ import '../widgets/filter_dropdown.dart';
+-import '../utils/localization.dart';
+-import '../utils/formatters.dart';
+ 
+ class MainScreen extends StatefulWidget {
+   const MainScreen({super.key});
+ 
+@@ -25,10 +24,11 @@
+ 
+   String _searchQuery = '';
+   String _sortOption = 'Name (A-Z)';
+   String _categoryFilter = 'All Categories';
+-  String _tagFilter = 'All Tags';
+   bool _ovrportFilter = false;
++  int _selectedMasterDetailIndex = 0;
++  String _viewMode = 'box';
+ 
+   List<String> _searchHistory = [];
+   final SearchController _searchController = SearchController();
+ 
+@@ -131,43 +131,8 @@
+     });
+     return sortedList;
+   }
+ 
+-  List<String> get _availableTags {
+-    final Set<String> tagsSet = {'All Tags'};
+-    for (var app in _apps) {
+-      if (app['tags'] != null) {
+-        final tagsStr = app['tags'].toString();
+-        if (tagsStr.trim().isEmpty) continue;
+-
+-        try {
+-          final List<dynamic> parsed = jsonDecode(tagsStr);
+-          for (var t in parsed) {
+-            final trimmed = t.toString().trim();
+-            if (trimmed.isNotEmpty) {
+-              tagsSet.add(trimmed);
+-            }
+-          }
+-        } catch (_) {
+-          final splits = tagsStr.replaceAll(RegExp(r'[\[\]"]'), '').split(',');
+-          for (var t in splits) {
+-            final trimmed = t.trim();
+-            if (trimmed.isNotEmpty) {
+-              tagsSet.add(trimmed);
+-            }
+-          }
+-        }
+-      }
+-    }
+-    final sortedList = tagsSet.toList();
+-    sortedList.sort((a, b) {
+-      if (a == 'All Tags') return -1;
+-      if (b == 'All Tags') return 1;
+-      return a.compareTo(b);
+-    });
+-    return sortedList;
+-  }
+-
+   List<dynamic> get _filteredAndSortedApps {
+     List<dynamic> filtered = _apps.where((app) {
+       final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
+           .toString()
+@@ -176,26 +141,12 @@
+           (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
+               .toString()
+               .toLowerCase();
+ 
+-      bool matchesTag = _tagFilter == 'All Tags';
+       String allTagsString = '';
+       if (app['tags'] != null) {
+         final tagsStr = app['tags'].toString();
+         allTagsString = tagsStr.toLowerCase();
+-        if (!matchesTag) {
+-          try {
+-            final List<dynamic> parsed = jsonDecode(tagsStr);
+-            matchesTag = parsed.any(
+-              (tag) => tag.toString().trim() == _tagFilter,
+-            );
+-          } catch (_) {
+-            final splits = tagsStr
+-                .replaceAll(RegExp(r'[\[\]"]'), '')
+-                .split(',');
+-            matchesTag = splits.any((tag) => tag.trim() == _tagFilter);
+-          }
+-        }
+       }
+ 
+       final query = _searchQuery.toLowerCase();
+       final matchesSearch =
+@@ -213,9 +164,9 @@
+               app['ovrport'] == true ||
+               app['ovrport'] == '1' ||
+               app['ovrport'] == 'true');
+ 
+-      return matchesSearch && matchesCategory && matchesTag && matchesOvrport;
++      return matchesSearch && matchesCategory && matchesOvrport;
+     }).toList();
+ 
+     filtered.sort((a, b) {
+       if (_sortOption == 'Name (A-Z)') {
+@@ -260,10 +211,18 @@
+         return Scaffold(
+           appBar: AppBar(
+             title: Row(
+               children: [
++                Padding(
++                  padding: const EdgeInsets.only(right: 8.0),
++                  child: Image.asset(
++                    'assets/app_icon.png',
++                    width: 32,
++                    height: 32,
++                  ),
++                ),
+                 Text(
+-                  'Pico 4 App Manager (${displayedApps.length})',
++                  'Liako\'s Store (${displayedApps.length})',
+                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                 ),
+                 SizedBox(width: 24),
+                 Expanded(
+@@ -421,24 +380,28 @@
+                         }
+                       },
+                     ),
+                     SizedBox(width: 16),
+-                    FilterDropdown(
+-                      value: _tagFilter,
+-                      icon: Icons.label,
+-                      items: _availableTags.map((String tag) {
+-                        return DropdownMenuItem<String>(
+-                          value: tag,
+-                          child: Text(tag),
+-                        );
+-                      }).toList(),
+-                      onChanged: (value) {
+-                        if (value != null) {
+-                          setState(() {
+-                            _tagFilter = value;
+-                          });
+-                        }
++                    ElevatedButton.icon(
++                      onPressed: () {
++                        setState(() {
++                          _categoryFilter = 'All Categories';
++                          _ovrportFilter = false;
++                          _searchController.clear();
++                          _searchQuery = '';
++                        });
+                       },
++                      icon: Icon(Icons.clear_all, size: 20),
++                      label: Text(
++                        tr('Clear filters'),
++                        style: TextStyle(fontWeight: FontWeight.w500),
++                      ),
++                      style: ElevatedButton.styleFrom(
++                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
++                        shape: RoundedRectangleBorder(
++                          borderRadius: BorderRadius.circular(20),
++                        ),
++                      ),
+                     ),
+                     SizedBox(width: 16),
+                     Row(
+                       mainAxisSize: MainAxisSize.min,
+@@ -458,8 +421,28 @@
+                         ),
+                       ],
+                     ),
+                     Spacer(),
++                    SegmentedButton<String>(
++                      showSelectedIcon: false,
++                      style: SegmentedButton.styleFrom(
++                        selectedBackgroundColor: Theme.of(context).primaryColor.withAlpha(40),
++                        selectedForegroundColor: Theme.of(context).primaryColor,
++                      ),
++                      segments: [
++                        ButtonSegment(value: 'box', icon: Tooltip(message: tr('Box'), child: Icon(Icons.grid_view))),
++                        ButtonSegment(value: 'row', icon: Tooltip(message: tr('Row'), child: Icon(Icons.view_list))),
++                        ButtonSegment(value: 'carousel', icon: Tooltip(message: tr('Carousel'), child: Icon(Icons.view_carousel))),
++                        ButtonSegment(value: 'masterDetail', icon: Tooltip(message: tr('Master Detail'), child: Icon(Icons.vertical_split))),
++                      ],
++                      selected: {_viewMode},
++                      onSelectionChanged: (Set<String> newSelection) {
++                        setState(() {
++                          _viewMode = newSelection.first;
++                        });
++                      },
++                    ),
++                    Spacer(),
+                     FilterDropdown(
+                       value: _sortOption,
+                       icon: Icons.sort,
+                       items: [
+@@ -563,34 +546,240 @@
+                   ),
+                 )
+               : LayoutBuilder(
+                   builder: (context, constraints) {
+-                    int crossAxisCount = constraints.maxWidth > 1200
+-                        ? 5
+-                        : constraints.maxWidth > 800
+-                        ? 4
+-                        : 2;
+-
+-                    return GridView.builder(
+-                      padding: EdgeInsets.symmetric(
+-                        horizontal: 24,
+-                        vertical: 24,
+-                      ),
+-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+-                        crossAxisCount: crossAxisCount,
+-                        childAspectRatio: 0.75, // Taller covers
+-                        crossAxisSpacing: 24,
+-                        mainAxisSpacing: 24,
+-                      ),
+-                      itemCount: displayedApps.length,
+-                      itemBuilder: (context, index) {
+-                        final app = displayedApps[index];
+-                        return AppCard(app: app, apiUrl: _apiUrl);
+-                      },
+-                    );
++                    return _buildViewMode(constraints, displayedApps);
+                   },
+                 ),
+         );
+       },
+     );
+   }
++
++  Widget _buildViewMode(BoxConstraints constraints, List<dynamic> displayedApps) {
++    if (displayedApps.isEmpty) {
++      return Center(child: Text(tr('No apps found')));
++    }
++    switch (_viewMode) {
++      case 'row':
++        return _buildRowView(displayedApps);
++      case 'carousel':
++        return _buildCarouselView(constraints, displayedApps);
++      case 'masterDetail':
++        return _buildMasterDetailView(constraints, displayedApps);
++      case 'box':
++      default:
++        return _buildBoxView(constraints, displayedApps);
++    }
++  }
++
++  Widget _buildBoxView(BoxConstraints constraints, List<dynamic> displayedApps) {
++    int crossAxisCount = constraints.maxWidth > 1200
++        ? 5
++        : constraints.maxWidth > 800
++            ? 4
++            : 2;
++
++    return GridView.builder(
++      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
++      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
++        crossAxisCount: crossAxisCount,
++        childAspectRatio: 0.75, // Taller covers
++        crossAxisSpacing: 24,
++        mainAxisSpacing: 24,
++      ),
++      itemCount: displayedApps.length,
++      itemBuilder: (context, index) {
++        return AppCard(app: displayedApps[index], apiUrl: _apiUrl);
++      },
++    );
++  }
++
++  Widget _buildRowView(List<dynamic> displayedApps) {
++    return ListView.separated(
++      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
++      itemCount: displayedApps.length,
++      separatorBuilder: (context, index) => SizedBox(height: 16),
++      itemBuilder: (context, index) {
++        // AppCard needs height constraints when in a ListView
++        return SizedBox(
++          height: 140, // Fixed height for row items
++          child: Row(
++            crossAxisAlignment: CrossAxisAlignment.start,
++            children: [
++              // Use AppCard but constrained to be square-ish
++              SizedBox(
++                width: 140,
++                child: AppCard(app: displayedApps[index], apiUrl: _apiUrl),
++              ),
++              SizedBox(width: 16),
++              Expanded(
++                child: Card(
++                  clipBehavior: Clip.antiAlias,
++                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
++                  child: Padding(
++                    padding: const EdgeInsets.all(16.0),
++                    child: Column(
++                      crossAxisAlignment: CrossAxisAlignment.start,
++                      children: [
++                        Text(
++                          displayedApps[index]['name'] ?? 'Unknown',
++                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
++                          maxLines: 1,
++                          overflow: TextOverflow.ellipsis,
++                        ),
++                        SizedBox(height: 8),
++                        Text(
++                          displayedApps[index]['versioncode']?.toString() ?? '',
++                          style: TextStyle(color: Colors.grey, fontSize: 14),
++                        ),
++                        Spacer(),
++                        if (displayedApps[index]['description'] != null)
++                          Text(
++                            displayedApps[index]['description'],
++                            maxLines: 2,
++                            overflow: TextOverflow.ellipsis,
++                          ),
++                      ],
++                    ),
++                  ),
++                ),
++              ),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
++  Widget _buildCarouselView(BoxConstraints constraints, List<dynamic> displayedApps) {
++    // Determine how many items to show fully
++    double viewportFraction = constraints.maxWidth > 1200 ? 0.2 : (constraints.maxWidth > 800 ? 0.3 : 0.6);
++    
++    return Center(
++      child: SizedBox(
++        height: constraints.maxHeight * 0.6, // Take 60% of vertical space
++        child: PageView.builder(
++          controller: PageController(viewportFraction: viewportFraction),
++          itemCount: displayedApps.length,
++          itemBuilder: (context, index) {
++            return Padding(
++              padding: const EdgeInsets.symmetric(horizontal: 12.0),
++              child: AppCard(app: displayedApps[index], apiUrl: _apiUrl),
++            );
++          },
++        ),
++      ),
++    );
++  }
++
++  Widget _buildMasterDetailView(BoxConstraints constraints, List<dynamic> displayedApps) {
++    if (_selectedMasterDetailIndex >= displayedApps.length) {
++      _selectedMasterDetailIndex = 0;
++    }
++    final selectedApp = displayedApps[_selectedMasterDetailIndex];
++
++    return Row(
++      children: [
++        // Master List (Left side)
++        SizedBox(
++          width: constraints.maxWidth * 0.35, // 35% width for master list
++          child: ListView.separated(
++            padding: EdgeInsets.all(16),
++            itemCount: displayedApps.length,
++            separatorBuilder: (context, index) => SizedBox(height: 8),
++            itemBuilder: (context, index) {
++              final app = displayedApps[index];
++              final isSelected = index == _selectedMasterDetailIndex;
++              return ListTile(
++                selected: isSelected,
++                selectedTileColor: Theme.of(context).primaryColor.withAlpha(25), // roughly 0.1 opacity
++                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
++                leading: ClipRRect(
++                  borderRadius: BorderRadius.circular(8),
++                  child: app['image'] != null
++                      ? Image.network(
++                          '$_apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
++                          width: 48,
++                          height: 48,
++                          fit: BoxFit.cover,
++                          errorBuilder: (ctx, err, stack) => Container(
++                            width: 48,
++                            height: 48,
++                            color: Colors.grey.withAlpha(51),
++                            child: Icon(Icons.videogame_asset),
++                          ),
++                        )
++                      : Container(
++                          width: 48,
++                          height: 48,
++                          color: Colors.grey.withAlpha(51),
++                          child: Icon(Icons.videogame_asset),
++                        ),
++                ),
++                title: Text(
++                  app['name'] ?? 'Unknown',
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
++                ),
++                subtitle: Text(
++                  app['versioncode']?.toString() ?? '',
++                  maxLines: 1,
++                ),
++                onTap: () {
++                  setState(() {
++                    _selectedMasterDetailIndex = index;
++                  });
++                },
++              );
++            },
++          ),
++        ),
++        VerticalDivider(width: 1),
++        // Detail View (Right side)
++        Expanded(
++          child: Padding(
++            padding: const EdgeInsets.all(24.0),
++            child: Row(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                SizedBox(
++                  width: 300,
++                  height: 400,
++                  child: AppCard(app: selectedApp, apiUrl: _apiUrl),
++                ),
++                SizedBox(width: 32),
++                Expanded(
++                  child: SingleChildScrollView(
++                    child: Column(
++                      crossAxisAlignment: CrossAxisAlignment.start,
++                      children: [
++                        Text(
++                          selectedApp['name'] ?? 'Unknown',
++                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
++                        ),
++                        SizedBox(height: 16),
++                        if (selectedApp['category'] != null || selectedApp['categories'] != null)
++                          Chip(label: Text(selectedApp['category'] ?? selectedApp['categories'] ?? '')),
++                        SizedBox(height: 16),
++                        Text(
++                          tr('Version: ') + (selectedApp['versioncode']?.toString() ?? 'N/A'),
++                          style: Theme.of(context).textTheme.titleMedium,
++                        ),
++                        SizedBox(height: 16),
++                        Text(
++                          selectedApp['description'] ?? tr('No description available.'),
++                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
++                        ),
++                      ],
++                    ),
++                  ),
++                )
++              ],
++            ),
++          ),
++        ),
++      ],
++    );
++  }
+ }
+

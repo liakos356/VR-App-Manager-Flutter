@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/filter_dropdown.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776257672101,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776257672101,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nclass FilterDropdown extends StatelessWidget {\n  final String value;\n  final IconData icon;\n  final List<DropdownMenuItem<String>> items;\n  final ValueChanged<String?> onChanged;\n\n  const FilterDropdown({\n    super.key,\n    required this.value,\n    required this.icon,\n    required this.items,\n    required this.onChanged,\n  });\n\n  @override\n  Widget build(BuildContext context) {\n    return Material(\n      elevation: 2,\n      borderRadius: BorderRadius.circular(12),\n      color: Theme.of(context).cardColor,\n      child: Container(\n        height: 40,\n        padding: const EdgeInsets.symmetric(horizontal: 16),\n        alignment: Alignment.center,\n        child: Row(\n          mainAxisSize: MainAxisSize.min,\n          children: [\n            Icon(icon, size: 20),\n            const SizedBox(width: 8),\n            DropdownButtonHideUnderline(\n              child: DropdownButton<String>(\n                value: value,\n                icon: const Icon(Icons.arrow_drop_down, size: 20),\n                items: items,\n                onChanged: onChanged,\n              ),\n            ),\n          ],\n        ),\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}

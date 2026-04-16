@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/trailer_dialog.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776257672101,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776257672101,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\nimport 'package:youtube_player_iframe/youtube_player_iframe.dart';\n\nclass TrailerDialog extends StatefulWidget {\n  final String videoId;\n  const TrailerDialog({super.key, required this.videoId});\n\n  @override\n  State<TrailerDialog> createState() => TrailerDialogState();\n}\n\nclass TrailerDialogState extends State<TrailerDialog> {\n  late final YoutubePlayerController _controller;\n\n  @override\n  void initState() {\n    super.initState();\n    _controller = YoutubePlayerController.fromVideoId(\n      videoId: widget.videoId,\n      autoPlay: true,\n      params: const YoutubePlayerParams(showFullscreenButton: true),\n    );\n  }\n\n  @override\n  void dispose() {\n    _controller.close();\n    super.dispose();\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return Dialog(\n      backgroundColor: Colors.transparent,\n      insetPadding: const EdgeInsets.all(20),\n      child: ConstrainedBox(\n        constraints: const BoxConstraints(maxWidth: 1000),\n        child: Stack(\n          alignment: Alignment.center,\n          children: [\n            ClipRRect(\n              borderRadius: BorderRadius.circular(12),\n              child: YoutubePlayer(controller: _controller),\n            ),\n            Positioned(\n              top: -10,\n              right: -10,\n              child: IconButton(\n                icon: const Icon(Icons.cancel, color: Colors.white, size: 36),\n                onPressed: () => Navigator.of(context).pop(),\n              ),\n            ),\n          ],\n        ),\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}

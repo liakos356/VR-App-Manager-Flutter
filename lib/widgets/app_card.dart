@@ -300,7 +300,7 @@ class AppCardState extends State<AppCard> {
                               width: double.infinity,
                               height: 350,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (context, error, stackTrace) => Container(
                                 width: double.infinity,
                                 height: 350,
                                 color: Colors.grey[800],
@@ -365,7 +365,7 @@ class AppCardState extends State<AppCard> {
                                     width: 200,
                                     height: 150,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (context, error, stackTrace) => Container(
                                       width: 200,
                                       height: 150,
                                       color: Colors.grey[800],
@@ -605,7 +605,7 @@ class AppCardState extends State<AppCard> {
                                             _installProgress = 1.0;
                                           });
 
-                                          if (mounted) {
+                                          if (context.mounted) {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
@@ -619,7 +619,7 @@ class AppCardState extends State<AppCard> {
                                           setState(() {
                                             _isInstalling = false;
                                           });
-                                          if (mounted) {
+                                          if (context.mounted) {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
