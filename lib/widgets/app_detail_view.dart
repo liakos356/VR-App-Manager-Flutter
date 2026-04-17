@@ -41,11 +41,31 @@ class _AppDetailViewState extends State<AppDetailView>
   double _installProgress = 0.0;
   String _installStatus = 'Starting...';
 
+  // Cached derived fields — updated in initState/didUpdateWidget.
+  List<String> _screenshots = [];
+  List<String> _tags = [];
+  String _appName = '';
+  String? _heroUrl;
+  String? _videoUrl;
+  String _genre = '';
+  double _rating = 0.0;
+  bool _isOvrport = false;
+
   @override
   void initState() {
     super.initState();
+    _updateDerivedFields();
     WidgetsBinding.instance.addObserver(this);
     _refreshInstallState();
+  }
+
+  @override
+  void didUpdateWidget(AppDetailView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app) {
+      _updateDerivedFields();
+      _refreshInstallState();
+    }
   }
 
   @override
@@ -152,26 +172,27 @@ class _AppDetailViewState extends State<AppDetailView>
         .toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenshots = _parseStringList(widget.app['screenshots']);
-    final tags = _parseStringList(widget.app['tags']);
-    final appName = widget.app['name'] ?? widget.app['title'] ?? 'Unknown App';
-    final heroUrl = (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
+  /// Recomputes all derived values from [widget.app].
+  /// Called once in [initState] and again in [didUpdateWidget] when the app changes.
+  void _updateDerivedFields() {
+    _screenshots = _parseStringList(widget.app['screenshots']);
+    _tags = _parseStringList(widget.app['tags']);
+    _appName = widget.app['name'] ?? widget.app['title'] ?? 'Unknown App';
+    _heroUrl = (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
         ?.toString();
-    final videoUrl = (widget.app['trailer_url'] ?? widget.app['video_url'])
+    _videoUrl = (widget.app['trailer_url'] ?? widget.app['video_url'])
         ?.toString();
-    final genre = (widget.app['genres'] ?? widget.app['category'] ?? '')
-        .toString();
-    final rating = parseRating(
-      widget.app['user_rating'] ?? widget.app['rating'],
-    );
-    final isOvrport =
+    _genre = (widget.app['genres'] ?? widget.app['category'] ?? '').toString();
+    _rating = parseRating(widget.app['user_rating'] ?? widget.app['rating']);
+    _isOvrport =
         widget.app['ovrport'] == 1 ||
         widget.app['ovrport'] == true ||
         widget.app['ovrport'] == '1' ||
         widget.app['ovrport'] == 'true';
+  }
 
+  @override
+  Widget build(BuildContext context) {
     final body = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -183,8 +204,8 @@ class _AppDetailViewState extends State<AppDetailView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppDetailHeroImage(url: heroUrl),
-                if (screenshots.isNotEmpty) ...[
+                AppDetailHeroImage(url: _heroUrl),
+                if (_screenshots.isNotEmpty) ...[
                   const SizedBox(height: 32),
                   Center(
                     child: Text(
@@ -201,7 +222,7 @@ class _AppDetailViewState extends State<AppDetailView>
                     child: SingleChildScrollView(
                       child: Center(
                         child: AppDetailScreenshotGrid(
-                          screenshots: screenshots,
+                          screenshots: _screenshots,
                         ),
                       ),
                     ),
@@ -229,7 +250,7 @@ class _AppDetailViewState extends State<AppDetailView>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            appName,
+                            _appName,
                             style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.w900,
@@ -267,9 +288,9 @@ class _AppDetailViewState extends State<AppDetailView>
                           installStatus: _installStatus,
                           onTap: _isInstalling ? null : _handleInstallTap,
                         ),
-                        if (videoUrl != null && videoUrl.isNotEmpty) ...[
+                        if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          AppDetailTrailerButton(videoUrl: videoUrl),
+                          AppDetailTrailerButton(videoUrl: _videoUrl!),
                         ],
                       ],
                     ),
@@ -286,15 +307,15 @@ class _AppDetailViewState extends State<AppDetailView>
                     children: [
                       // Genre badge
                       BadgeChip(
-                        label: genre.isEmpty ? 'Category' : genre,
+                        label: _genre.isEmpty ? 'Category' : _genre,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       // Ovrport + rating row
-                      RatingRow(isOvrport: isOvrport, rating: rating),
+                      RatingRow(isOvrport: _isOvrport, rating: _rating),
                       // Tags
-                      if (tags.isNotEmpty) ...[
+                      if (_tags.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        TagChips(tags: tags),
+                        TagChips(tags: _tags),
                       ],
                       const SizedBox(height: 48),
                       Text(
@@ -323,7 +344,7 @@ class _AppDetailViewState extends State<AppDetailView>
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: Text(appName),
+          title: Text(_appName),
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: body,

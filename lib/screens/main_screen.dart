@@ -23,11 +23,11 @@ class MainScreen extends StatefulWidget {
 }
 
 class MainScreenState extends State<MainScreen> {
-  final String _apiUrl = _kApiUrl;
-
   // ── Data ──────────────────────────────────────────────────────────────────
 
   List<dynamic> _apps = [];
+  List<dynamic> _cachedFilteredApps = [];
+  String? _fetchError;
   bool _isLoading = false;
   double _downloadProgress = -1.0;
 
@@ -57,7 +57,10 @@ class MainScreenState extends State<MainScreen> {
     _loadSearchHistory();
     _fetchApps();
     _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text);
+      setState(() {
+        _searchQuery = _searchController.text;
+        _refilter();
+      });
     });
   }
 
@@ -97,6 +100,7 @@ class MainScreenState extends State<MainScreen> {
   Future<void> _fetchApps({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
+      _fetchError = null;
       _downloadProgress = -1.0;
     });
     try {
@@ -105,9 +109,13 @@ class MainScreenState extends State<MainScreen> {
         forceRefresh: forceRefresh,
         onProgress: (p) => setState(() => _downloadProgress = p),
       );
-      setState(() => _apps = smbApps);
+      setState(() {
+        _apps = smbApps;
+        _refilter();
+      });
     } catch (e) {
       debugPrint('Error fetching apps from DB: $e');
+      setState(() => _fetchError = e.toString());
     } finally {
       setState(() {
         _isLoading = false;
@@ -125,19 +133,23 @@ class MainScreenState extends State<MainScreen> {
 
   List<String> get _availableAppTypes => filter.availableAppTypes(_apps);
 
-  List<dynamic> get _filteredAndSortedApps => filter.filteredAndSorted(
-    _apps,
-    searchQuery: _searchQuery,
-    categoryFilter: _categoryFilter,
-    ovrportFilter: _ovrportFilter,
-    typeFilter: _typeFilter,
-    sortOption: _sortOption,
-  );
+  /// Recomputes the filtered+sorted list into [_cachedFilteredApps].
+  /// Call this inside every [setState] that changes a filter input or [_apps].
+  void _refilter() {
+    _cachedFilteredApps = filter.filteredAndSorted(
+      _apps,
+      searchQuery: _searchQuery,
+      categoryFilter: _categoryFilter,
+      ovrportFilter: _ovrportFilter,
+      typeFilter: _typeFilter,
+      sortOption: _sortOption,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final displayedApps = _filteredAndSortedApps;
+    final displayedApps = _cachedFilteredApps;
 
     return ValueListenableBuilder<bool>(
       valueListenable: isGreekNotifier,
@@ -154,7 +166,10 @@ class MainScreenState extends State<MainScreen> {
                 AppTypeSegmentedButton(
                   availableTypes: _availableAppTypes,
                   selected: _typeFilter,
-                  onChanged: (t) => setState(() => _typeFilter = t),
+                  onChanged: (t) => setState(() {
+                    _typeFilter = t;
+                    _refilter();
+                  }),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -179,12 +194,23 @@ class MainScreenState extends State<MainScreen> {
               viewMode: _viewMode,
               sortOption: _sortOption,
               onCategoryChanged: (v) {
-                if (v != null) setState(() => _categoryFilter = v);
+                if (v != null)
+                  setState(() {
+                    _categoryFilter = v;
+                    _refilter();
+                  });
               },
-              onOvrportChanged: (v) => setState(() => _ovrportFilter = v),
+              onOvrportChanged: (v) => setState(() {
+                _ovrportFilter = v;
+                _refilter();
+              }),
               onViewModeChanged: (v) => setState(() => _viewMode = v),
               onSortChanged: (v) {
-                if (v != null) setState(() => _sortOption = v);
+                if (v != null)
+                  setState(() {
+                    _sortOption = v;
+                    _refilter();
+                  });
               },
             ),
             actions: [
@@ -237,6 +263,11 @@ class MainScreenState extends State<MainScreen> {
           ),
           body: _isLoading
               ? _LoadingBody(downloadProgress: _downloadProgress)
+              : _fetchError != null
+              ? _ErrorBody(
+                  message: _fetchError!,
+                  onRetry: () => _fetchApps(forceRefresh: true),
+                )
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (_viewMode == 'master_detail') {
@@ -244,7 +275,7 @@ class MainScreenState extends State<MainScreen> {
                     }
                     return _AppGrid(
                       apps: displayedApps,
-                      apiUrl: _apiUrl,
+                      apiUrl: _kApiUrl,
                       constraints: constraints,
                     );
                   },
@@ -272,12 +303,12 @@ class MainScreenState extends State<MainScreen> {
           return AppListTile(
             app: displayedApps[index],
             isSelected: index == _selectedMasterDetailIndex,
-            apiUrl: _apiUrl,
+            apiUrl: _kApiUrl,
             onTap: () => setState(() => _selectedMasterDetailIndex = index),
           );
         },
       ),
-      right: AppDetailPanel(app: selectedApp, apiUrl: _apiUrl),
+      right: AppDetailPanel(app: selectedApp, apiUrl: _kApiUrl),
     );
   }
 }
@@ -343,7 +374,56 @@ class _AppGrid extends StatelessWidget {
         mainAxisSpacing: 24,
       ),
       itemCount: apps.length,
-      itemBuilder: (_, index) => AppCard(app: apps[index], apiUrl: apiUrl),
+      itemBuilder: (_, index) => AppCard(
+        key: ValueKey(apps[index]['id'] ?? index),
+        app: apps[index],
+        apiUrl: apiUrl,
+      ),
+    );
+  }
+}
+
+/// Full-screen error widget shown when [MainScreenState._fetchApps] throws.
+class _ErrorBody extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorBody({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: Colors.redAccent),
+            const SizedBox(height: 24),
+            Text(
+              'Failed to load apps',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

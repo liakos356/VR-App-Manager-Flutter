@@ -18,16 +18,7 @@ class AppCard extends StatefulWidget {
   final dynamic app;
   final String apiUrl;
 
-  // TODO(legacy): isDetailView is no longer used; callers should migrate to
-  // AppDetailView directly.  Kept here to avoid breaking existing call-sites.
-  final bool isDetailView;
-
-  const AppCard({
-    super.key,
-    required this.app,
-    required this.apiUrl,
-    this.isDetailView = false,
-  });
+  const AppCard({super.key, required this.app, required this.apiUrl});
 
   @override
   State<AppCard> createState() => AppCardState();
@@ -38,12 +29,22 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
   int _currentImageIndex = 0;
   bool _isInstalled = false;
   String _installedPackageName = '';
+  late List<String> _images;
 
   @override
   void initState() {
     super.initState();
+    _images = _parseImages(widget.app);
     WidgetsBinding.instance.addObserver(this);
     _refreshInstallState();
+  }
+
+  @override
+  void didUpdateWidget(AppCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app) {
+      _images = _parseImages(widget.app);
+    }
   }
 
   @override
@@ -67,14 +68,16 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
     }
   }
 
-  List<String> get _allImages {
+  /// Parses the app map into an ordered list of image URLs.
+  /// Kept as a static helper so it can be called from [initState] and
+  /// [didUpdateWidget] without allocating a getter closure on each build.
+  static List<String> _parseImages(dynamic app) {
     final images = <String>[];
-    final hero = (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
-        ?.toString();
+    final hero = (app['thumbnail_url'] ?? app['preview_photo'])?.toString();
     if (hero != null && hero.isNotEmpty) images.add(hero);
-    if (widget.app['screenshots'] != null) {
+    if (app['screenshots'] != null) {
       try {
-        final decoded = jsonDecode(widget.app['screenshots'].toString());
+        final decoded = jsonDecode(app['screenshots'].toString());
         if (decoded is List) {
           images.addAll(
             decoded.map((e) => e.toString()).where((e) => e.isNotEmpty),
@@ -109,16 +112,6 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Legacy support: callers that pass isDetailView=true get AppDetailView.
-    if (widget.isDetailView) {
-      return AppDetailView(
-        app: widget.app,
-        apiUrl: widget.apiUrl,
-        showAsPage: false,
-      );
-    }
-
-    final images = _allImages;
     final isOvrport =
         widget.app['ovrport'] == 1 ||
         widget.app['ovrport'] == true ||
@@ -151,20 +144,20 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      images.isNotEmpty
+                      _images.isNotEmpty
                           ? CardImageCarousel(
-                              images: images,
+                              images: _images,
                               currentIndex: _currentImageIndex,
                               isHovered: _isHovered,
-                              hasMultiple: images.length > 1,
+                              hasMultiple: _images.length > 1,
                               onPrev: () => setState(() {
                                 _currentImageIndex =
-                                    (_currentImageIndex - 1 + images.length) %
-                                    images.length;
+                                    (_currentImageIndex - 1 + _images.length) %
+                                    _images.length;
                               }),
                               onNext: () => setState(() {
                                 _currentImageIndex =
-                                    (_currentImageIndex + 1) % images.length;
+                                    (_currentImageIndex + 1) % _images.length;
                               }),
                             )
                           : Container(
