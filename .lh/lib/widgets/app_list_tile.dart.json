@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/app_list_tile.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776438923484,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776438923484,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nimport '../utils/localization.dart';\n\n/// A single row in the master-detail list panel.\n///\n/// Displays a thumbnail, title, and short description for one VR app.\nclass AppListTile extends StatelessWidget {\n  final dynamic app;\n  final bool isSelected;\n  final String apiUrl;\n  final VoidCallback onTap;\n\n  const AppListTile({\n    super.key,\n    required this.app,\n    required this.isSelected,\n    required this.apiUrl,\n    required this.onTap,\n  });\n\n  @override\n  Widget build(BuildContext context) {\n    final isGreek = isGreekNotifier.value;\n    final desc = isGreek\n        ? (app['short_description_gr'] ?? app['description'] ?? '')\n        : (app['short_description'] ?? app['description'] ?? '');\n    final imgUrl = app['thumbnail_url'] ?? app['preview_photo'];\n\n    final Widget leadingImage;\n    if (app['image'] != null) {\n      leadingImage = Image.network(\n        '$apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',\n        width: 64,\n        height: 64,\n        fit: BoxFit.cover,\n        errorBuilder: (_, _, _) => _placeholder(),\n      );\n    } else if (imgUrl != null) {\n      leadingImage = Image.network(\n        imgUrl,\n        width: 64,\n        height: 64,\n        fit: BoxFit.cover,\n        errorBuilder: (_, _, _) => _placeholder(),\n      );\n    } else {\n      leadingImage = _placeholder();\n    }\n\n    return ListTile(\n      selected: isSelected,\n      selectedTileColor: Theme.of(context).primaryColor.withAlpha(25),\n      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),\n      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),\n      leading: ClipRRect(\n        borderRadius: BorderRadius.circular(8),\n        child: leadingImage,\n      ),\n      title: Text(\n        app['name'] ?? app['title'] ?? 'Unknown',\n        maxLines: 1,\n        overflow: TextOverflow.ellipsis,\n        style: TextStyle(\n          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,\n          fontSize: 16,\n        ),\n      ),\n      subtitle: Text(\n        desc,\n        maxLines: 2,\n        overflow: TextOverflow.ellipsis,\n        style: const TextStyle(fontSize: 13),\n      ),\n      onTap: onTap,\n    );\n  }\n\n  static Widget _placeholder() => Container(\n        width: 64,\n        height: 64,\n        color: Colors.grey.withAlpha(51),\n        child: const Icon(Icons.videogame_asset),\n      );\n}\n"
+        }
+    ]
+}

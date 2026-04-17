@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/app_detail_media.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776438923485,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776438923485,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\nimport 'fullscreen_image_viewer.dart';\n\n/// Hero banner image for the app detail view.\nclass AppDetailHeroImage extends StatelessWidget {\n  final String? url;\n  const AppDetailHeroImage({super.key, this.url});\n\n  @override\n  Widget build(BuildContext context) {\n    if (url != null && url!.isNotEmpty) {\n      return ClipRRect(\n        borderRadius: BorderRadius.circular(16),\n        child: Image.network(\n          url!,\n          width: double.infinity,\n          height: 350,\n          fit: BoxFit.cover,\n          errorBuilder: (context, error, stackTrace) => _placeholder(),\n        ),\n      );\n    }\n    return _placeholder();\n  }\n\n  Widget _placeholder() => Container(\n        width: double.infinity,\n        height: 350,\n        decoration: BoxDecoration(\n          color: Colors.grey[800],\n          borderRadius: BorderRadius.circular(16),\n        ),\n        child: const Center(\n          child: Icon(Icons.vrpano, size: 80, color: Colors.white54),\n        ),\n      );\n}\n\n/// Grid of screenshot thumbnails; tapping opens a fullscreen viewer.\nclass AppDetailScreenshotGrid extends StatelessWidget {\n  final List<String> screenshots;\n  const AppDetailScreenshotGrid({super.key, required this.screenshots});\n\n  @override\n  Widget build(BuildContext context) {\n    final isDark = Theme.of(context).brightness == Brightness.dark;\n    final placeholderColor = isDark ? Colors.grey[800] : Colors.grey[300];\n    final iconColor = isDark ? Colors.white54 : Colors.black54;\n\n    return Wrap(\n      spacing: 16,\n      runSpacing: 16,\n      alignment: WrapAlignment.center,\n      children: List.generate(screenshots.length, (index) {\n        return GestureDetector(\n          onTap: () => showDialog(\n            context: context,\n            builder: (context) => FullscreenImageViewer(\n              imageUrls: screenshots,\n              initialIndex: index,\n            ),\n          ),\n          child: ClipRRect(\n            borderRadius: BorderRadius.circular(12),\n            child: Image.network(\n              screenshots[index],\n              width: 200,\n              height: 150,\n              fit: BoxFit.cover,\n              loadingBuilder: (context, child, progress) {\n                if (progress == null) return child;\n                return Container(\n                  width: 200,\n                  height: 150,\n                  color: placeholderColor,\n                  child: Center(\n                    child: CircularProgressIndicator(\n                      value: progress.expectedTotalBytes != null\n                          ? progress.cumulativeBytesLoaded /\n                              progress.expectedTotalBytes!\n                          : null,\n                    ),\n                  ),\n                );\n              },\n              errorBuilder: (context, error, stackTrace) => Container(\n                width: 200,\n                height: 150,\n                color: placeholderColor,\n                child: Center(\n                  child: Icon(Icons.broken_image, color: iconColor),\n                ),\n              ),\n            ),\n          ),\n        );\n      }),\n    );\n  }\n}\n"
+        }
+    ]
+}

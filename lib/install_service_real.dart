@@ -58,79 +58,12 @@ class InstallService {
       final apkFile = File(dlPath);
       debugPrint('[InstallService] DL path set to ${apkFile.path}');
 
-      int totalSizeToDownload = 0;
-      int totalDownloaded = 0;
-
-      Future<int> getRemoteSize(String remotePath) async {
-        try {
-          final exists = await pool!.exists(remotePath);
-          if (!exists) return 0;
-          return await pool.fileSize(remotePath);
-        } catch (e) {
-          debugPrint('[InstallService] Error getting size for $remotePath: $e');
-          return 0;
-        }
-      }
-
-      Future<bool> downloadFile(
-        String remotePath,
-        File localFile,
-        int size,
-      ) async {
-        try {
-          debugPrint(
-            '[InstallService] Downloading $remotePath -> ${localFile.path}',
-          );
-          onProgress('Downloading ${localFile.path.split('/').last}...');
-          if (size == 0) return false;
-
-          final stream = pool!.streamFile(
-            remotePath,
-            chunkSize: 1024 * 1024 * 2,
-          );
-          final sink = localFile.openWrite();
-
-          try {
-            int speedDownloaded = totalDownloaded;
-            DateTime lastSpeedTime = DateTime.now();
-
-            await for (var chunk in stream) {
-              if (isCancelled != null && isCancelled()) {
-                throw Exception('Installation cancelled by user');
-              }
-              final chunkLen = (chunk as List<int>).length;
-              sink.add(chunk);
-              totalDownloaded += chunkLen;
-              if (totalSizeToDownload > 0 && onDownloadProgress != null) {
-                onDownloadProgress(totalDownloaded / totalSizeToDownload);
-              }
-
-              final now = DateTime.now();
-              final elapsed = now.difference(lastSpeedTime).inMilliseconds;
-              if (elapsed >= 500) {
-                final speedBytes = totalDownloaded - speedDownloaded;
-                final speedMbps = (speedBytes / 1024 / 1024) / (elapsed / 1000);
-                onProgress('${speedMbps.toStringAsFixed(1)} MB/s');
-                speedDownloaded = totalDownloaded;
-                lastSpeedTime = now;
-              }
-
-              // Yield to Flutter event loop so UI can paint the progress bar
-              await Future.delayed(const Duration(milliseconds: 5));
-            }
-          } finally {
-            await sink.flush();
-            await sink.close();
-          }
-
-          final finalSize = await localFile.length();
-          debugPrint('[InstallService] Downloaded $finalSize bytes.');
-          return finalSize == size;
-        } catch (e) {
-          debugPrint('[InstallService] _downloadFile error: $e');
-          return false;
-        }
-      }
+      final dl = _SmbDownloader(
+        pool: pool,
+        onProgress: onProgress,
+        onDownloadProgress: onDownloadProgress,
+        isCancelled: isCancelled,
+      );
 
       // 1. Resolve APK size and path
       String apkRemotePathToDownload = '';
@@ -149,13 +82,13 @@ class InstallService {
 
       onProgress('Locating APK...');
       if (relativeApkPath.isNotEmpty) {
-        apkSize = await getRemoteSize(relativeApkPath);
+        apkSize = await dl.getRemoteSize(relativeApkPath);
         if (apkSize > 0) apkRemotePathToDownload = relativeApkPath;
       }
 
       if (apkSize == 0 || apkRemotePathToDownload.isEmpty) {
         final altApkPath = 'downloads\\pico4\\apps\\$appId.apk';
-        apkSize = await getRemoteSize(altApkPath);
+        apkSize = await dl.getRemoteSize(altApkPath);
         if (apkSize > 0) apkRemotePathToDownload = altApkPath;
       }
 
@@ -167,7 +100,7 @@ class InstallService {
             String name = f.name.toString();
             if (name.endsWith('.apk')) {
               final checkPath = '$folder\\$name';
-              apkSize = await getRemoteSize(checkPath);
+              apkSize = await dl.getRemoteSize(checkPath);
               if (apkSize > 0) {
                 apkRemotePathToDownload = checkPath;
                 break;
@@ -221,7 +154,7 @@ class InstallService {
           if (name.endsWith('.obb')) {
             final obbRemotePath = '$folderToUseObb\\$name';
             final obbLocalFile = File('${localObbDir.path}/$name');
-            final size = await getRemoteSize(obbRemotePath);
+            final size = await dl.getRemoteSize(obbRemotePath);
             if (size > 0) {
               obbFilesToDownload.add({
                 'remotePath': obbRemotePath,
@@ -238,12 +171,12 @@ class InstallService {
 
       // Calculate aggregated size
       for (var obb in obbFilesToDownload) {
-        totalSizeToDownload += obb['size'] as int;
+        dl.totalSizeToDownload += obb['size'] as int;
       }
-      totalSizeToDownload += apkSize;
+      dl.totalSizeToDownload += apkSize;
 
       debugPrint(
-        '[InstallService] Total size to download: $totalSizeToDownload',
+        '[InstallService] Total size to download: ${dl.totalSizeToDownload}',
       );
 
       // 3. Download sequence
@@ -257,7 +190,7 @@ class InstallService {
         }
 
         for (var obb in obbFilesToDownload) {
-          final success = await downloadFile(
+          final success = await dl.downloadFile(
             obb['remotePath'] as String,
             obb['localFile'] as File,
             obb['size'] as int,
@@ -269,7 +202,7 @@ class InstallService {
       }
 
       onProgress('Downloading APK...');
-      final apkSuccess = await downloadFile(
+      final apkSuccess = await dl.downloadFile(
         apkRemotePathToDownload,
         apkFile,
         apkSize,
@@ -297,6 +230,92 @@ class InstallService {
       throw Exception('Install Error: $e');
     } finally {
       await pool?.disconnect();
+    }
+  }
+}
+
+// ── SMB download helper ───────────────────────────────────────────────────────
+
+/// Wraps a live [Smb2Pool] connection and provides [getRemoteSize] /
+/// [downloadFile] helpers that share download-progress state.
+class _SmbDownloader {
+  final Smb2Pool pool;
+  final void Function(String) onProgress;
+  final void Function(double)? onDownloadProgress;
+  final bool Function()? isCancelled;
+
+  int totalSizeToDownload = 0;
+  int totalDownloaded = 0;
+
+  _SmbDownloader({
+    required this.pool,
+    required this.onProgress,
+    this.onDownloadProgress,
+    this.isCancelled,
+  });
+
+  Future<int> getRemoteSize(String remotePath) async {
+    try {
+      final exists = await pool.exists(remotePath);
+      if (!exists) return 0;
+      return await pool.fileSize(remotePath);
+    } catch (e) {
+      debugPrint('[InstallService] Error getting size for $remotePath: $e');
+      return 0;
+    }
+  }
+
+  Future<bool> downloadFile(String remotePath, File localFile, int size) async {
+    try {
+      debugPrint(
+        '[InstallService] Downloading $remotePath -> ${localFile.path}',
+      );
+      onProgress('Downloading ${localFile.path.split('/').last}...');
+      if (size == 0) return false;
+
+      final stream = pool.streamFile(remotePath, chunkSize: 1024 * 1024 * 2);
+      final sink = localFile.openWrite();
+
+      try {
+        int speedDownloaded = totalDownloaded;
+        DateTime lastSpeedTime = DateTime.now();
+
+        await for (final chunk in stream) {
+          if (isCancelled != null && isCancelled!()) {
+            throw Exception('Installation cancelled by user');
+          }
+          final chunkLen = (chunk as List<int>).length;
+          sink.add(chunk);
+          totalDownloaded += chunkLen;
+
+          if (totalSizeToDownload > 0 && onDownloadProgress != null) {
+            onDownloadProgress!(totalDownloaded / totalSizeToDownload);
+          }
+
+          final now = DateTime.now();
+          final elapsed = now.difference(lastSpeedTime).inMilliseconds;
+          if (elapsed >= 500) {
+            final speedBytes = totalDownloaded - speedDownloaded;
+            final speedMbps = (speedBytes / 1024 / 1024) / (elapsed / 1000);
+            onProgress('${speedMbps.toStringAsFixed(1)} MB/s');
+            speedDownloaded = totalDownloaded;
+            lastSpeedTime = now;
+          }
+
+          // Yield to Flutter event loop so the progress bar can repaint.
+          await Future.delayed(const Duration(milliseconds: 5));
+        }
+      } finally {
+        await sink.flush();
+        await sink.close();
+      }
+
+      final finalSize = await localFile.length();
+      debugPrint('[InstallService] Downloaded $finalSize bytes.');
+      return finalSize == size;
+    } catch (e) {
+      debugPrint('[InstallService] downloadFile error: $e');
+      return false;
     }
   }
 }

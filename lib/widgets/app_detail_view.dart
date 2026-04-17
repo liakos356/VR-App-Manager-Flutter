@@ -3,16 +3,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:installed_apps/installed_apps.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../install_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import '../utils/localization.dart';
-import 'fullscreen_image_viewer.dart';
-import 'star_rating.dart';
-import 'trailer_dialog.dart';
-import 'video_dialog.dart';
+import 'app_detail_actions.dart';
+import 'app_detail_media.dart';
+import 'badge_chip.dart';
 
 /// Full detail view for a VR app.
 ///
@@ -185,7 +183,7 @@ class _AppDetailViewState extends State<AppDetailView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _HeroImage(url: heroUrl),
+                AppDetailHeroImage(url: heroUrl),
                 if (screenshots.isNotEmpty) ...[
                   const SizedBox(height: 32),
                   Center(
@@ -202,7 +200,9 @@ class _AppDetailViewState extends State<AppDetailView>
                   Expanded(
                     child: SingleChildScrollView(
                       child: Center(
-                        child: _ScreenshotGrid(screenshots: screenshots),
+                        child: AppDetailScreenshotGrid(
+                          screenshots: screenshots,
+                        ),
                       ),
                     ),
                   ),
@@ -260,7 +260,7 @@ class _AppDetailViewState extends State<AppDetailView>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _InstallButton(
+                        AppDetailInstallButton(
                           isInstalled: _isInstalled,
                           isInstalling: _isInstalling,
                           installProgress: _installProgress,
@@ -269,7 +269,7 @@ class _AppDetailViewState extends State<AppDetailView>
                         ),
                         if (videoUrl != null && videoUrl.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          _TrailerButton(videoUrl: videoUrl),
+                          AppDetailTrailerButton(videoUrl: videoUrl),
                         ],
                       ],
                     ),
@@ -285,16 +285,16 @@ class _AppDetailViewState extends State<AppDetailView>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Genre badge
-                      _BadgeChip(
+                      BadgeChip(
                         label: genre.isEmpty ? 'Category' : genre,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       // Ovrport + rating row
-                      _RatingRow(isOvrport: isOvrport, rating: rating),
+                      RatingRow(isOvrport: isOvrport, rating: rating),
                       // Tags
                       if (tags.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        _TagChips(tags: tags),
+                        TagChips(tags: tags),
                       ],
                       const SizedBox(height: 48),
                       Text(
@@ -305,7 +305,7 @@ class _AppDetailViewState extends State<AppDetailView>
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _DescriptionBox(app: widget.app),
+                      _DescriptionBox(app: widget.app), // stays local
                     ],
                   ),
                 ),
@@ -333,271 +333,7 @@ class _AppDetailViewState extends State<AppDetailView>
   }
 }
 
-// ── Private helper widgets ────────────────────────────────────────────────────
-
-class _HeroImage extends StatelessWidget {
-  final String? url;
-  const _HeroImage({this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    if (url != null && url!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.network(
-          url!,
-          width: double.infinity,
-          height: 350,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _placeholder(),
-        ),
-      );
-    }
-    return _placeholder();
-  }
-
-  Widget _placeholder() => Container(
-    width: double.infinity,
-    height: 350,
-    decoration: BoxDecoration(
-      color: Colors.grey[800],
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: const Center(
-      child: Icon(Icons.vrpano, size: 80, color: Colors.white54),
-    ),
-  );
-}
-
-class _ScreenshotGrid extends StatelessWidget {
-  final List<String> screenshots;
-  const _ScreenshotGrid({required this.screenshots});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final placeholderColor = isDark ? Colors.grey[800] : Colors.grey[300];
-    final iconColor = isDark ? Colors.white54 : Colors.black54;
-
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      alignment: WrapAlignment.center,
-      children: List.generate(screenshots.length, (index) {
-        return GestureDetector(
-          onTap: () => showDialog(
-            context: context,
-            builder: (_) => FullscreenImageViewer(
-              imageUrls: screenshots,
-              initialIndex: index,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              screenshots[index],
-              width: 200,
-              height: 150,
-              fit: BoxFit.cover,
-              loadingBuilder: (_, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  width: 200,
-                  height: 150,
-                  color: placeholderColor,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (_, _, _) => Container(
-                width: 200,
-                height: 150,
-                color: placeholderColor,
-                child: Center(
-                  child: Icon(Icons.broken_image, color: iconColor),
-                ),
-              ),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-}
-
-class _InstallButton extends StatelessWidget {
-  final bool isInstalled;
-  final bool isInstalling;
-  final double installProgress;
-  final String installStatus;
-  final VoidCallback? onTap;
-
-  const _InstallButton({
-    required this.isInstalled,
-    required this.isInstalling,
-    required this.installProgress,
-    required this.installStatus,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bgColor = isInstalling
-        ? Colors.grey.shade800
-        : (isInstalled
-              ? Colors.red.shade600
-              : Theme.of(context).colorScheme.primary);
-
-    final label = isInstalling
-        ? (installProgress > 0.0 && installProgress < 1.0
-              ? '${(installProgress * 100).toInt()}%'
-              : installStatus)
-        : (isInstalled ? tr('Uninstall') : tr('Install'));
-
-    return Container(
-      height: 72,
-      constraints: const BoxConstraints(minWidth: 200),
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (isInstalling)
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: installProgress.clamp(0.0, 1.0),
-                  child: Container(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-            ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 48,
-                  vertical: 24,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isInstalling ? Icons.downloading : Icons.download,
-                      size: 28,
-                      color: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrailerButton extends StatelessWidget {
-  final String videoUrl;
-  const _TrailerButton({required this.videoUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () async {
-        String url = videoUrl;
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-          url = 'https://$url';
-        }
-        final videoId = YoutubePlayerController.convertUrlToId(url);
-        if (videoId != null && context.mounted) {
-          showDialog(
-            context: context,
-            builder: (_) => TrailerDialog(videoId: videoId),
-          );
-        } else if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (_) => VideoDialog(videoUrl: url),
-          );
-        }
-      },
-      icon: const Icon(Icons.play_circle_fill, size: 28),
-      label: Text(
-        tr('Watch Trailer'),
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-    );
-  }
-}
-
-/// A rounded badge/chip used for genre and ovrport labels.
-class _BadgeChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool outlined;
-
-  const _BadgeChip({
-    required this.label,
-    required this.color,
-    this.outlined = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: outlined
-            ? Border.all(color: color.withValues(alpha: 0.5))
-            : null,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 18,
-        ),
-      ),
-    );
-  }
-}
+// ── Private helper widget (only used in this file) ────────────────────────────
 
 class _DescriptionBox extends StatelessWidget {
   final dynamic app;
@@ -640,96 +376,6 @@ class _DescriptionBox extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-
-// ── Rating + ovrport badge row ────────────────────────────────────────────────
-
-class _RatingRow extends StatelessWidget {
-  final bool isOvrport;
-  final double rating;
-
-  const _RatingRow({required this.isOvrport, required this.rating});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        if (isOvrport)
-          Padding(
-            padding: const EdgeInsets.only(top: 12.0, right: 12.0),
-            child: _BadgeChip(
-              label: 'Ovrport',
-              color: Colors.orange,
-              outlined: true,
-            ),
-          ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12.0),
-            child: Row(
-              children: [
-                StarRating(rating: rating, size: 32),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    '${rating.toStringAsFixed(1).replaceAll('.0', '')}/5',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Tag chips row ─────────────────────────────────────────────────────────────
-
-class _TagChips extends StatelessWidget {
-  final List<String> tags;
-  const _TagChips({required this.tags});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: tags.map((tag) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.secondary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.secondary.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Text(
-            tag,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.secondary,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 }

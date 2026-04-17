@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import 'app_detail_view.dart';
+import 'card_image_carousel.dart';
 import 'install_bottom_sheet.dart';
 import 'star_rating.dart';
 
@@ -151,7 +152,7 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                     fit: StackFit.expand,
                     children: [
                       images.isNotEmpty
-                          ? _CardImageCarousel(
+                          ? CardImageCarousel(
                               images: images,
                               currentIndex: _currentImageIndex,
                               isHovered: _isHovered,
@@ -298,87 +299,6 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── Private helpers ───────────────────────────────────────────────────────────
-
-/// Image strip with hover-activated prev/next navigation and dot indicators.
-class _CardImageCarousel extends StatelessWidget {
-  final List<String> images;
-  final int currentIndex;
-  final bool isHovered;
-  final bool hasMultiple;
-  final VoidCallback onPrev;
-  final VoidCallback onNext;
-
-  const _CardImageCarousel({
-    required this.images,
-    required this.currentIndex,
-    required this.isHovered,
-    required this.hasMultiple,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.network(
-          images[currentIndex],
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Container(
-            color: Colors.grey[800],
-            child: const Center(
-              child: Icon(Icons.vrpano, size: 64, color: Colors.white54),
-            ),
-          ),
-        ),
-        if (isHovered && hasMultiple) ...[
-          Positioned.fill(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _navButton(icon: Icons.chevron_left, onPressed: onPrev),
-                _navButton(icon: Icons.chevron_right, onPressed: onNext),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 8,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(images.length, (i) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: currentIndex == i ? 8 : 6,
-                  height: currentIndex == i ? 8 : 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: currentIndex == i ? Colors.white : Colors.white54,
-                  ),
-                );
-              }),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _navButton({required IconData icon, required VoidCallback onPressed}) {
-    return IconButton(
-      icon: Icon(icon, color: Colors.white, size: 32),
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: Colors.black45,
-        shape: const CircleBorder(),
       ),
     );
   }

@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/widgets/card_image_carousel.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776438923486,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776438923486,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\n\n/// Image strip with hover-activated prev/next navigation and dot indicators.\n///\n/// Used inside [AppCard] to cycle through a VR app's cover images.\nclass CardImageCarousel extends StatelessWidget {\n  final List<String> images;\n  final int currentIndex;\n  final bool isHovered;\n  final bool hasMultiple;\n  final VoidCallback onPrev;\n  final VoidCallback onNext;\n\n  const CardImageCarousel({\n    super.key,\n    required this.images,\n    required this.currentIndex,\n    required this.isHovered,\n    required this.hasMultiple,\n    required this.onPrev,\n    required this.onNext,\n  });\n\n  @override\n  Widget build(BuildContext context) {\n    return Stack(\n      fit: StackFit.expand,\n      children: [\n        Image.network(\n          images[currentIndex],\n          fit: BoxFit.cover,\n          errorBuilder: (context, error, stackTrace) => Container(\n            color: Colors.grey[800],\n            child: const Center(\n              child: Icon(Icons.vrpano, size: 64, color: Colors.white54),\n            ),\n          ),\n        ),\n        if (isHovered && hasMultiple) ...[\n          Positioned.fill(\n            child: Row(\n              mainAxisAlignment: MainAxisAlignment.spaceBetween,\n              children: [\n                _navButton(icon: Icons.chevron_left, onPressed: onPrev),\n                _navButton(icon: Icons.chevron_right, onPressed: onNext),\n              ],\n            ),\n          ),\n          Positioned(\n            bottom: 8,\n            left: 0,\n            right: 0,\n            child: Row(\n              mainAxisAlignment: MainAxisAlignment.center,\n              children: List.generate(images.length, (i) {\n                return Container(\n                  margin: const EdgeInsets.symmetric(horizontal: 2),\n                  width: currentIndex == i ? 8 : 6,\n                  height: currentIndex == i ? 8 : 6,\n                  decoration: BoxDecoration(\n                    shape: BoxShape.circle,\n                    color: currentIndex == i ? Colors.white : Colors.white54,\n                  ),\n                );\n              }),\n            ),\n          ),\n        ],\n      ],\n    );\n  }\n\n  Widget _navButton({\n    required IconData icon,\n    required VoidCallback onPressed,\n  }) {\n    return IconButton(\n      icon: Icon(icon, color: Colors.white, size: 32),\n      onPressed: onPressed,\n      style: IconButton.styleFrom(\n        backgroundColor: Colors.black45,\n        shape: const CircleBorder(),\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}
