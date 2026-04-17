@@ -310,7 +310,7 @@ class MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final displayedApps = _filteredAndSortedApps;
 
     return ValueListenableBuilder<bool>(
@@ -325,308 +325,41 @@ class MainScreenState extends State<MainScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
                 ),
                 SizedBox(width: 16),
-                SegmentedButton<String>(
-                  showSelectedIcon: false,
-                  style: SegmentedButton.styleFrom(
-                    elevation: 2,
-                    side: BorderSide.none,
-                    selectedBackgroundColor: Theme.of(
-                      context,
-                    ).primaryColor.withAlpha(40),
-                    selectedForegroundColor: Theme.of(context).primaryColor,
-                  ),
-                  segments: [
-                    ButtonSegment(
-                      value: 'all',
-                      icon: Tooltip(
-                        message: tr('All'),
-                        child: Icon(Icons.apps),
-                      ),
-                    ),
-                    ..._availableAppTypes.map((type) {
-                      IconData iconData;
-                      String titleStr;
-                      if (type == 'game') {
-                        iconData = Icons.sports_esports;
-                        titleStr = 'Games';
-                      } else if (type == 'app') {
-                        iconData = Icons.developer_board;
-                        titleStr = 'Apps';
-                      } else {
-                        iconData = Icons.extension;
-                        titleStr = type[0].toUpperCase() + type.substring(1);
-                      }
-                      return ButtonSegment(
-                        value: type,
-                        icon: Tooltip(
-                          message: tr(titleStr),
-                          child: Icon(iconData),
-                        ),
-                      );
-                    }),
-                  ],
-                  selected: {_typeFilter},
-                  onSelectionChanged: (Set<String> newSelection) {
-                    setState(() {
-                      _typeFilter = newSelection.first;
-                    });
-                  },
+                _AppTypeSegmentedButton(
+                  availableTypes: _availableAppTypes,
+                  selected: _typeFilter,
+                  onChanged: (t) => setState(() => _typeFilter = t),
                 ),
                 SizedBox(width: 16),
                 Expanded(
                   child: SizedBox(
                     height: 40,
-                    child: SearchAnchor(
-                      isFullScreen: false,
-                      searchController: _searchController,
-                      viewConstraints: BoxConstraints(maxHeight: 300),
-                      builder:
-                          (BuildContext context, SearchController controller) {
-                            return Material(
-                              elevation: 2,
-                              borderRadius: BorderRadius.circular(20),
-                              child: TextField(
-                                controller: controller,
-                                onTap: () => controller.openView(),
-                                onChanged: (_) => controller.openView(),
-                                onSubmitted: (value) {
-                                  _saveSearchHistory(value);
-                                  controller.closeView(value);
-                                },
-                                decoration: InputDecoration(
-                                  hintText: 'Search apps...',
-                                  prefixIcon: Icon(Icons.search, size: 20),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(context).cardColor,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    vertical: 0,
-                                    horizontal: 16,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                      suggestionsBuilder:
-                          (BuildContext context, SearchController controller) {
-                            final String query = controller.text.toLowerCase();
-                            if (query.isEmpty) {
-                              final List<Widget> historyItems = _searchHistory
-                                  .map((String historyItem) {
-                                    return ListTile(
-                                      leading: Icon(Icons.history),
-                                      title: Text(historyItem),
-                                      onTap: () {
-                                        controller.closeView(historyItem);
-                                        _saveSearchHistory(historyItem);
-                                      },
-                                    );
-                                  })
-                                  .toList();
-
-                              if (historyItems.isNotEmpty) {
-                                historyItems.add(
-                                  ListTile(
-                                    leading: Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
-                                    ),
-                                    title: Text(
-                                      tr('Clear history'),
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                    onTap: () {
-                                      _clearSearchHistory();
-                                      controller.closeView('');
-                                      Future.delayed(
-                                        Duration(milliseconds: 50),
-                                        () => controller.openView(),
-                                      );
-                                    },
-                                  ),
-                                );
-                              }
-                              return historyItems;
-                            }
-
-                            Set<String> suggestions = {};
-                            for (var app in _apps) {
-                              final name = (app['name'] ?? app['title'] ?? '')
-                                  .toString();
-                              if (name.toLowerCase().contains(query)) {
-                                suggestions.add(name);
-                                final words = name.split(RegExp(r'\s+'));
-                                for (final w in words) {
-                                  if (w.length > 2 &&
-                                      w.toLowerCase().startsWith(query)) {
-                                    suggestions.add(w);
-                                  }
-                                }
-                              }
-
-                              final categoryStr =
-                                  (app['categories'] ?? app['category'] ?? '')
-                                      .toString();
-                              for (final c in categoryStr.split(',')) {
-                                if (c.trim().toLowerCase().contains(query)) {
-                                  suggestions.add(c.trim());
-                                }
-                              }
-
-                              final tagsStr = (app['tags'] ?? '').toString();
-                              for (final t
-                                  in tagsStr
-                                      .replaceAll(RegExp(r'[\[\]"]'), '')
-                                      .split(',')) {
-                                if (t.trim().toLowerCase().contains(query)) {
-                                  suggestions.add(t.trim());
-                                }
-                              }
-                            }
-
-                            return suggestions.take(10).map((
-                              String suggestion,
-                            ) {
-                              return ListTile(
-                                leading: Icon(Icons.search),
-                                title: Text(suggestion),
-                                onTap: () {
-                                  controller.closeView(suggestion);
-                                  _saveSearchHistory(suggestion);
-                                },
-                              );
-                            });
-                          },
+                    child: _AppSearchField(
+                      apps: _apps,
+                      searchHistory: _searchHistory,
+                      controller: _searchController,
+                      onSaveHistory: _saveSearchHistory,
+                      onClearHistory: _clearSearchHistory,
                     ),
                   ),
                 ),
               ],
             ),
-            bottom: PreferredSize(
-              preferredSize: Size.fromHeight(60.0),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
-                  children: [
-                    FilterDropdown(
-                      value: _categoryFilter,
-                      icon: Icons.category,
-                      items: _availableCategories.map((String category) {
-                        int count = _getCategoryCount(category);
-                        return DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(
-                            category == 'All Categories'
-                                ? category
-                                : '$category ($count)',
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _categoryFilter = value;
-                          });
-                        }
-                      },
-                    ),
-                    SizedBox(width: 16),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          tr('Ovrport Only'),
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        SizedBox(width: 4),
-                        Switch(
-                          value: _ovrportFilter,
-                          onChanged: (bool value) {
-                            setState(() {
-                              _ovrportFilter = value;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    Spacer(),
-                    SegmentedButton<String>(
-                      style: SegmentedButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).primaryColor.withAlpha(20),
-                        selectedBackgroundColor: Theme.of(
-                          context,
-                        ).primaryColor.withAlpha(40),
-                        selectedForegroundColor: Theme.of(context).primaryColor,
-                      ),
-                      segments: [
-                        ButtonSegment(
-                          value: 'grid',
-                          icon: Tooltip(
-                            message: tr('Grid View'),
-                            child: Icon(Icons.grid_view),
-                          ),
-                        ),
-                        ButtonSegment(
-                          value: 'master_detail',
-                          icon: Tooltip(
-                            message: tr('Master Detail'),
-                            child: Icon(Icons.vertical_split),
-                          ),
-                        ),
-                      ],
-                      selected: {_viewMode},
-                      onSelectionChanged: (Set<String> newSelection) {
-                        setState(() {
-                          _viewMode = newSelection.first;
-                        });
-                      },
-                    ),
-                    SizedBox(width: 16),
-                    FilterDropdown(
-                      value: _sortOption,
-                      icon: Icons.sort,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'Name (A-Z)',
-                          child: Text(tr('Name (A-Z)')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Name (Z-A)',
-                          child: Text(tr('Name (Z-A)')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Rating (High to Low)',
-                          child: Text(tr('Rating (High to Low)')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Rating (Low to High)',
-                          child: Text(tr('Rating (Low to High)')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Size (Large to Small)',
-                          child: Text(tr('Size (Large to Small)')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Size (Small to Large)',
-                          child: Text(tr('Size (Small to Large)')),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _sortOption = value;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            bottom: _FilterBar(
+              categoryFilter: _categoryFilter,
+              availableCategories: _availableCategories,
+              getCategoryCount: _getCategoryCount,
+              ovrportFilter: _ovrportFilter,
+              viewMode: _viewMode,
+              sortOption: _sortOption,
+              onCategoryChanged: (v) {
+                if (v != null) setState(() => _categoryFilter = v);
+              },
+              onOvrportChanged: (v) => setState(() => _ovrportFilter = v),
+              onViewModeChanged: (v) => setState(() => _viewMode = v),
+              onSortChanged: (v) {
+                if (v != null) setState(() => _sortOption = v);
+              },
             ),
             actions: [
               Center(
@@ -634,7 +367,10 @@ class MainScreenState extends State<MainScreen> {
                   padding: const EdgeInsets.only(right: 16.0),
                   child: Text(
                     '(${displayedApps.length})',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -644,7 +380,7 @@ class MainScreenState extends State<MainScreen> {
                   return IconButton(
                     icon: Text(
                       isGreek ? 'GR' : 'EN',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -668,37 +404,15 @@ class MainScreenState extends State<MainScreen> {
                 tooltip: tr('Toggle Theme'),
               ),
               IconButton(
-                icon: Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh),
                 onPressed: () => _fetchApps(forceRefresh: true),
                 tooltip: tr('Refresh Apps'),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
             ],
           ),
           body: _isLoading
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (_downloadProgress < 0)
-                        CircularProgressIndicator()
-                      else
-                        SizedBox(
-                          width: 200,
-                          child: LinearProgressIndicator(
-                            value: _downloadProgress,
-                          ),
-                        ),
-                      SizedBox(height: 16),
-                      Text(
-                        _downloadProgress < 0
-                            ? 'Fetching database...'
-                            : 'Fetching database... ${(_downloadProgress * 100).toStringAsFixed(1)}%',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                )
+              ? _LoadingBody(downloadProgress: _downloadProgress)
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (_viewMode == 'master_detail') {
@@ -708,29 +422,10 @@ class MainScreenState extends State<MainScreen> {
                         displayedApps,
                       );
                     }
-
-                    int crossAxisCount = constraints.maxWidth > 1200
-                        ? 5
-                        : constraints.maxWidth > 800
-                        ? 4
-                        : 2;
-
-                    return GridView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 24,
-                      ),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: 0.75, // Taller covers
-                        crossAxisSpacing: 24,
-                        mainAxisSpacing: 24,
-                      ),
-                      itemCount: displayedApps.length,
-                      itemBuilder: (context, index) {
-                        final app = displayedApps[index];
-                        return AppCard(app: app, apiUrl: _apiUrl);
-                      },
+                    return _AppGrid(
+                      apps: displayedApps,
+                      apiUrl: _apiUrl,
+                      constraints: constraints,
                     );
                   },
                 ),
@@ -756,9 +451,9 @@ class MainScreenState extends State<MainScreen> {
 
     return AdjustableSplitView(
       left: ListView.separated(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         itemCount: displayedApps.length,
-        separatorBuilder: (context, index) => SizedBox(height: 8),
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final app = displayedApps[index];
           return _AppListTile(
@@ -770,6 +465,391 @@ class MainScreenState extends State<MainScreen> {
         },
       ),
       right: AppDetailPanel(app: selectedApp, apiUrl: _apiUrl),
+    );
+  }
+}
+
+// ── AppBar filter bar (bottom PreferredSize) ──────────────────────────────────
+
+class _FilterBar extends StatelessWidget implements PreferredSizeWidget {
+  final String categoryFilter;
+  final List<String> availableCategories;
+  final int Function(String) getCategoryCount;
+  final bool ovrportFilter;
+  final String viewMode;
+  final String sortOption;
+  final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<bool> onOvrportChanged;
+  final ValueChanged<String> onViewModeChanged;
+  final ValueChanged<String?> onSortChanged;
+
+  const _FilterBar({
+    required this.categoryFilter,
+    required this.availableCategories,
+    required this.getCategoryCount,
+    required this.ovrportFilter,
+    required this.viewMode,
+    required this.sortOption,
+    required this.onCategoryChanged,
+    required this.onOvrportChanged,
+    required this.onViewModeChanged,
+    required this.onSortChanged,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(60.0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        children: [
+          FilterDropdown(
+            value: categoryFilter,
+            icon: Icons.category,
+            items: availableCategories.map((String category) {
+              final count = getCategoryCount(category);
+              return DropdownMenuItem<String>(
+                value: category,
+                child: Text(
+                  category == 'All Categories'
+                      ? category
+                      : '$category ($count)',
+                ),
+              );
+            }).toList(),
+            onChanged: onCategoryChanged,
+          ),
+          const SizedBox(width: 16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                tr('Ovrport Only'),
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 4),
+              Switch(value: ovrportFilter, onChanged: onOvrportChanged),
+            ],
+          ),
+          const Spacer(),
+          SegmentedButton<String>(
+            style: SegmentedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor.withAlpha(20),
+              selectedBackgroundColor: Theme.of(
+                context,
+              ).primaryColor.withAlpha(40),
+              selectedForegroundColor: Theme.of(context).primaryColor,
+            ),
+            segments: [
+              ButtonSegment(
+                value: 'grid',
+                icon: Tooltip(
+                  message: tr('Grid View'),
+                  child: const Icon(Icons.grid_view),
+                ),
+              ),
+              ButtonSegment(
+                value: 'master_detail',
+                icon: Tooltip(
+                  message: tr('Master Detail'),
+                  child: const Icon(Icons.vertical_split),
+                ),
+              ),
+            ],
+            selected: {viewMode},
+            onSelectionChanged: (Set<String> sel) =>
+                onViewModeChanged(sel.first),
+          ),
+          const SizedBox(width: 16),
+          FilterDropdown(
+            value: sortOption,
+            icon: Icons.sort,
+            items: [
+              DropdownMenuItem(
+                value: 'Name (A-Z)',
+                child: Text(tr('Name (A-Z)')),
+              ),
+              DropdownMenuItem(
+                value: 'Name (Z-A)',
+                child: Text(tr('Name (Z-A)')),
+              ),
+              DropdownMenuItem(
+                value: 'Rating (High to Low)',
+                child: Text(tr('Rating (High to Low)')),
+              ),
+              DropdownMenuItem(
+                value: 'Rating (Low to High)',
+                child: Text(tr('Rating (Low to High)')),
+              ),
+              DropdownMenuItem(
+                value: 'Size (Large to Small)',
+                child: Text(tr('Size (Large to Small)')),
+              ),
+              DropdownMenuItem(
+                value: 'Size (Small to Large)',
+                child: Text(tr('Size (Small to Large)')),
+              ),
+            ],
+            onChanged: onSortChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── App-type segmented button ─────────────────────────────────────────────────
+
+class _AppTypeSegmentedButton extends StatelessWidget {
+  final List<String> availableTypes;
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _AppTypeSegmentedButton({
+    required this.availableTypes,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<String>(
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        elevation: 2,
+        side: BorderSide.none,
+        selectedBackgroundColor: Theme.of(context).primaryColor.withAlpha(40),
+        selectedForegroundColor: Theme.of(context).primaryColor,
+      ),
+      segments: [
+        ButtonSegment(
+          value: 'all',
+          icon: Tooltip(message: tr('All'), child: const Icon(Icons.apps)),
+        ),
+        ...availableTypes.map((type) {
+          final IconData iconData;
+          final String titleStr;
+          if (type == 'game') {
+            iconData = Icons.sports_esports;
+            titleStr = 'Games';
+          } else if (type == 'app') {
+            iconData = Icons.developer_board;
+            titleStr = 'Apps';
+          } else {
+            iconData = Icons.extension;
+            titleStr = type[0].toUpperCase() + type.substring(1);
+          }
+          return ButtonSegment(
+            value: type,
+            icon: Tooltip(message: tr(titleStr), child: Icon(iconData)),
+          );
+        }),
+      ],
+      selected: {selected},
+      onSelectionChanged: (Set<String> sel) => onChanged(sel.first),
+    );
+  }
+}
+
+// ── Search field with autocomplete suggestions ────────────────────────────────
+
+class _AppSearchField extends StatelessWidget {
+  final List<dynamic> apps;
+  final List<String> searchHistory;
+  final SearchController controller;
+  final Future<void> Function(String) onSaveHistory;
+  final VoidCallback onClearHistory;
+
+  const _AppSearchField({
+    required this.apps,
+    required this.searchHistory,
+    required this.controller,
+    required this.onSaveHistory,
+    required this.onClearHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SearchAnchor(
+      isFullScreen: false,
+      searchController: controller,
+      viewConstraints: const BoxConstraints(maxHeight: 300),
+      builder: (BuildContext context, SearchController ctl) {
+        return Material(
+          elevation: 2,
+          borderRadius: BorderRadius.circular(20),
+          child: TextField(
+            controller: ctl,
+            onTap: () => ctl.openView(),
+            onChanged: (_) => ctl.openView(),
+            onSubmitted: (value) {
+              onSaveHistory(value);
+              ctl.closeView(value);
+            },
+            decoration: InputDecoration(
+              hintText: 'Search apps...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).cardColor,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 0,
+                horizontal: 16,
+              ),
+            ),
+          ),
+        );
+      },
+      suggestionsBuilder: (BuildContext context, SearchController ctl) {
+        final String query = ctl.text.toLowerCase();
+        if (query.isEmpty) {
+          final List<Widget> historyItems = searchHistory.map((String item) {
+            return ListTile(
+              leading: const Icon(Icons.history),
+              title: Text(item),
+              onTap: () {
+                ctl.closeView(item);
+                onSaveHistory(item);
+              },
+            );
+          }).toList();
+
+          if (historyItems.isNotEmpty) {
+            historyItems.add(
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  tr('Clear history'),
+                  style: const TextStyle(color: Colors.red),
+                ),
+                onTap: () {
+                  onClearHistory();
+                  ctl.closeView('');
+                  Future.delayed(
+                    const Duration(milliseconds: 50),
+                    () => ctl.openView(),
+                  );
+                },
+              ),
+            );
+          }
+          return historyItems;
+        }
+
+        final Set<String> suggestions = {};
+        for (final app in apps) {
+          final name = (app['name'] ?? app['title'] ?? '').toString();
+          if (name.toLowerCase().contains(query)) {
+            suggestions.add(name);
+            for (final w in name.split(RegExp(r'\s+'))) {
+              if (w.length > 2 && w.toLowerCase().startsWith(query)) {
+                suggestions.add(w);
+              }
+            }
+          }
+
+          final categoryStr = (app['categories'] ?? app['category'] ?? '')
+              .toString();
+          for (final c in categoryStr.split(',')) {
+            if (c.trim().toLowerCase().contains(query)) {
+              suggestions.add(c.trim());
+            }
+          }
+
+          final tagsStr = (app['tags'] ?? '').toString();
+          for (final t
+              in tagsStr.replaceAll(RegExp(r'[\[\]"]'), '').split(',')) {
+            if (t.trim().toLowerCase().contains(query)) {
+              suggestions.add(t.trim());
+            }
+          }
+        }
+
+        return suggestions.take(10).map((String suggestion) {
+          return ListTile(
+            leading: const Icon(Icons.search),
+            title: Text(suggestion),
+            onTap: () {
+              ctl.closeView(suggestion);
+              onSaveHistory(suggestion);
+            },
+          );
+        });
+      },
+    );
+  }
+}
+
+// ── Loading indicator ─────────────────────────────────────────────────────────
+
+class _LoadingBody extends StatelessWidget {
+  final double downloadProgress;
+  const _LoadingBody({required this.downloadProgress});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (downloadProgress < 0)
+            const CircularProgressIndicator()
+          else
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(value: downloadProgress),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            downloadProgress < 0
+                ? 'Fetching database...'
+                : 'Fetching database... ${(downloadProgress * 100).toStringAsFixed(1)}%',
+            style: const TextStyle(fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Responsive app grid ───────────────────────────────────────────────────────
+
+class _AppGrid extends StatelessWidget {
+  final List<dynamic> apps;
+  final String apiUrl;
+  final BoxConstraints constraints;
+
+  const _AppGrid({
+    required this.apps,
+    required this.apiUrl,
+    required this.constraints,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final int crossAxisCount = constraints.maxWidth > 1200
+        ? 5
+        : constraints.maxWidth > 800
+        ? 4
+        : 2;
+
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 24,
+        mainAxisSpacing: 24,
+      ),
+      itemCount: apps.length,
+      itemBuilder: (context, index) {
+        return AppCard(app: apps[index], apiUrl: apiUrl);
+      },
     );
   }
 }

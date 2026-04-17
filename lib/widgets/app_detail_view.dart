@@ -290,84 +290,11 @@ class _AppDetailViewState extends State<AppDetailView>
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       // Ovrport + rating row
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          if (isOvrport)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: 12.0,
-                                right: 12.0,
-                              ),
-                              child: _BadgeChip(
-                                label: 'Ovrport',
-                                color: Colors.orange,
-                                outlined: true,
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 12.0),
-                              child: Row(
-                                children: [
-                                  StarRating(rating: rating, size: 32),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      '${rating.toStringAsFixed(1).replaceAll('.0', '')}/5',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.color
-                                            ?.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      _RatingRow(isOvrport: isOvrport, rating: rating),
                       // Tags
                       if (tags.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: tags.map((tag) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.secondary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.secondary
-                                      .withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                        _TagChips(tags: tags),
                       ],
                       const SizedBox(height: 48),
                       Text(
@@ -713,6 +640,96 @@ class _DescriptionBox extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+// ── Rating + ovrport badge row ────────────────────────────────────────────────
+
+class _RatingRow extends StatelessWidget {
+  final bool isOvrport;
+  final double rating;
+
+  const _RatingRow({required this.isOvrport, required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (isOvrport)
+          Padding(
+            padding: const EdgeInsets.only(top: 12.0, right: 12.0),
+            child: _BadgeChip(
+              label: 'Ovrport',
+              color: Colors.orange,
+              outlined: true,
+            ),
+          ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: Row(
+              children: [
+                StarRating(rating: rating, size: 32),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '${rating.toStringAsFixed(1).replaceAll('.0', '')}/5',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Tag chips row ─────────────────────────────────────────────────────────────
+
+class _TagChips extends StatelessWidget {
+  final List<String> tags;
+  const _TagChips({required this.tags});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: tags.map((tag) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.secondary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.secondary.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Text(
+            tag,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.secondary,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
