@@ -1,0 +1,38 @@
+   753	                                                        (progress) {
+   754	                                                          if (progress >= 0.0 &&
+   755	                                                              progress <= 1.0) {
+   756	                                                            setState(() {
+   757	                                                              _installProgress =
+   758	                                                                  progress;
+   759	                                                            });
+   760	                                                          }
+   761	                                                        },
+   762	                                                      isCancelled: () => _cancelRequested,
+   763	                                                    ).showSnackBar(
+   764	                                                      SnackBar(
+   765	                                                        content: Text(
+   766	                                                          tr(
+   767	                                                            'Installation Completed!',
+   768	                                                          ),
+   769	                                                        ),
+   770	                                                        backgroundColor:
+   771	                                                            Colors.green,
+   772	                                                      ),
+   773	                                                    );
+   774	                                                  }
+   775	                                                } catch (e) {
+   776	                                                  setState(() {
+   777	                                                    _isInstalling = false;
+   778	                                                  });
+   779	                                                  if (context.mounted) {
+   780	                                                    ScaffoldMessenger.of(
+   781	                                                      context,
+   782	                                                    ).showSnackBar(
+   783	                                                      SnackBar(
+   784	                                                        content: Text(
+   785	                                                          'Error: $e',
+   786	                                                        ),
+   787	                                                        backgroundColor:
+   788	                                                            Colors.red,
+   789	                                                      ),
+   790	                                                    );

@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/install_service_stub.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776436707624,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776436707624,
+            "name": "Commit-0",
+            "content": "class InstallService {\n  static Future<void> installAppLocally({\n    required String appId,\n    required String apkPath,\n    required String obbDir,\n    required Function(String) onProgress,\n    Function(double)? onDownloadProgress,\n    bool Function()? isCancelled,\n  }) async {\n    throw UnsupportedError('Local install is not supported on this platform.');\n  }\n}\n"
+        }
+    ]
+}

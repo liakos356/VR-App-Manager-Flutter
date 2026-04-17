@@ -5,6 +5,7 @@ class InstallService {
     required String obbDir,
     required Function(String) onProgress,
     Function(double)? onDownloadProgress,
+    bool Function()? isCancelled,
   }) async {
     throw UnsupportedError('Local install is not supported on this platform.');
   }

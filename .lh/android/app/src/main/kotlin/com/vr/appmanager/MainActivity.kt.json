@@ -1,0 +1,18 @@
+{
+    "sourceFile": "android/app/src/main/kotlin/com/vr/appmanager/MainActivity.kt",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776374180713,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776374180712,
+            "name": "Commit-0",
+            "content": "package com.vr.appmanager\n\nimport android.content.Intent\nimport android.net.Uri\nimport android.os.Build\nimport androidx.core.content.FileProvider\nimport io.flutter.embedding.android.FlutterActivity\nimport io.flutter.embedding.engine.FlutterEngine\nimport io.flutter.plugin.common.MethodChannel\nimport java.io.File\n\nclass MainActivity : FlutterActivity() {\n    private val CHANNEL = \"com.vr.appmanager/install\"\n\n    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {\n        super.configureFlutterEngine(flutterEngine)\n        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler {\n                call,\n                result ->\n            if (call.method == \"installApk\") {\n                val apkPath = call.argument<String>(\"apkPath\")\n                if (apkPath != null) {\n                    val success = installApk(apkPath)\n                    result.success(success)\n                } else {\n                    result.error(\"INVALID_ARGUMENT\", \"APK path not provided\", null)\n                }\n            } else {\n                result.notImplemented()\n            }\n        }\n    }\n\n    private fun installApk(apkPath: String): Boolean {\n        return try {\n            val file = File(apkPath)\n            if (!file.exists()) return false\n\n            val intent = Intent(Intent.ACTION_VIEW)\n            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)\n\n            // Use FileProvider for correct API 24+ file sharing\n            val uri =\n                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {\n                        FileProvider.getUriForFile(\n                                context,\n                                \"${context.packageName}.fileprovider\",\n                                file\n                        )\n                    } else {\n                        Uri.fromFile(file)\n                    }\n\n            intent.setDataAndType(uri, \"application/vnd.android.package-archive\")\n            startActivity(intent)\n            true\n        } catch (e: Exception) {\n            e.printStackTrace()\n            false\n        }\n    }\n}\n"
+        }
+    ]
+}

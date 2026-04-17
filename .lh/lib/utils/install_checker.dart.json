@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/utils/install_checker.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776436707036,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776436707036,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/foundation.dart';\nimport 'package:installed_apps/installed_apps.dart';\n\n/// Result of checking whether an app is currently installed on the device.\ntypedef InstallCheckResult = ({bool isInstalled, String packageName});\n\n/// Returns an [InstallCheckResult] for [app] by querying the device's\n/// installed-apps list using multiple matching strategies:\n///\n/// - Exact package-name match against `package_name` or `id` fields.\n/// - APK-path substring match.\n/// - Fuzzy title match (strips non-alpha chars then checks containment).\nFuture<InstallCheckResult> checkAppInstalled(dynamic app) async {\n  try {\n    final installedList = await InstalledApps.getInstalledApps(\n      excludeSystemApps: false,\n      excludeNonLaunchableApps: false,\n    );\n\n    final title = (app['title']?.toString() ?? '').toLowerCase();\n    final apkPath = (app['file_path_apk']?.toString() ?? '').toLowerCase();\n    final id = (app['id']?.toString() ?? '').toLowerCase();\n    final dbPackage = (app['package_name']?.toString() ?? '').toLowerCase();\n    final nonAlpha = RegExp(r'[^a-zA-Z]');\n    final cleanTitle = title.replaceAll(nonAlpha, '');\n\n    for (final a in installedList) {\n      if (a.packageName.isEmpty) continue;\n      final pkgName = a.packageName.trim().toLowerCase();\n      final cleanPkg = pkgName\n          .replaceAll('com.', '')\n          .replaceAll('org.', '')\n          .replaceAll('net.', '')\n          .replaceAll('co.', '')\n          .replaceAll(nonAlpha, '');\n\n      final fuzzyMatch = cleanTitle.isNotEmpty &&\n          cleanPkg.isNotEmpty &&\n          (cleanTitle.contains(cleanPkg) || cleanPkg.contains(cleanTitle));\n\n      if (apkPath.contains(pkgName) ||\n          id == pkgName ||\n          id.contains(pkgName) ||\n          dbPackage == pkgName ||\n          dbPackage.contains(pkgName) ||\n          a.name.toLowerCase().contains(title) ||\n          fuzzyMatch) {\n        return (isInstalled: true, packageName: a.packageName.trim());\n      }\n    }\n  } catch (e) {\n    debugPrint('[installChecker] $e');\n  }\n  return (isInstalled: false, packageName: '');\n}\n"
+        }
+    ]
+}

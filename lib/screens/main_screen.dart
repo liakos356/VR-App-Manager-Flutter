@@ -9,6 +9,89 @@ import '../widgets/app_card.dart';
 import '../widgets/app_detail_panel.dart';
 import '../widgets/filter_dropdown.dart';
 
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/// A single row in the master-detail list.
+class _AppListTile extends StatelessWidget {
+  final dynamic app;
+  final bool isSelected;
+  final String apiUrl;
+  final VoidCallback onTap;
+
+  const _AppListTile({
+    required this.app,
+    required this.isSelected,
+    required this.apiUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isGreek = isGreekNotifier.value;
+    final desc = isGreek
+        ? (app['short_description_gr'] ?? app['description'] ?? '')
+        : (app['short_description'] ?? app['description'] ?? '');
+    final imgUrl = app['thumbnail_url'] ?? app['preview_photo'];
+
+    Widget leadingImage;
+    if (app['image'] != null) {
+      leadingImage = Image.network(
+        '$apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholderIcon(),
+      );
+    } else if (imgUrl != null) {
+      leadingImage = Image.network(
+        imgUrl,
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _placeholderIcon(),
+      );
+    } else {
+      leadingImage = _placeholderIcon();
+    }
+
+    return ListTile(
+      selected: isSelected,
+      selectedTileColor: Theme.of(context).primaryColor.withAlpha(25),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: leadingImage,
+      ),
+      title: Text(
+        app['name'] ?? app['title'] ?? 'Unknown',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 16,
+        ),
+      ),
+      subtitle: Text(
+        desc,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 13),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _placeholderIcon() => Container(
+    width: 64,
+    height: 64,
+    color: Colors.grey.withAlpha(51),
+    child: const Icon(Icons.videogame_asset),
+  );
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -113,48 +196,31 @@ class MainScreenState extends State<MainScreen> {
   }
 
   List<String> get _availableCategories {
-    final Set<String> categories = {'All Categories'};
-    for (var app in _apps) {
-      final catString =
-          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
-              .toString();
-      if (catString.isNotEmpty) {
-        final splits = catString.split(',');
-        for (var c in splits) {
-          final trimmed = c.trim();
-          if (trimmed.isNotEmpty) {
-            categories.add(trimmed);
-          }
-        }
+    final categories = <String>{'All Categories'};
+    for (final app in _apps) {
+      final catString = (app['categories'] ?? app['category'] ?? '').toString();
+      for (final c in catString.split(',')) {
+        final trimmed = c.trim();
+        if (trimmed.isNotEmpty) categories.add(trimmed);
       }
     }
-    final sortedList = categories.toList();
-    sortedList.sort((a, b) {
+    return categories.toList()..sort((a, b) {
       if (a == 'All Categories') return -1;
       if (b == 'All Categories') return 1;
       return a.compareTo(b);
     });
-    return sortedList;
   }
 
   int _getCategoryCount(String category) {
     if (category == 'All Categories') return _apps.length;
-    int count = 0;
     final catLower = category.toLowerCase();
-    for (var app in _apps) {
-      final catString =
-          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
-              .toString()
-              .toLowerCase();
-      if (catString.isNotEmpty) {
-        final splits = catString.split(',');
-        for (var c in splits) {
-          if (c.trim() == catLower) {
-            count++;
-            break; // A single app shouldn't be counted twice for the same category
-          }
-        }
-      }
+    int count = 0;
+    for (final app in _apps) {
+      final cats = (app['categories'] ?? app['category'] ?? '')
+          .toString()
+          .toLowerCase()
+          .split(',');
+      if (cats.any((c) => c.trim() == catLower)) count++;
     }
     return count;
   }
@@ -177,25 +243,17 @@ class MainScreenState extends State<MainScreen> {
 
   List<dynamic> get _filteredAndSortedApps {
     List<dynamic> filtered = _apps.where((app) {
-      final name = (((app['name'] ?? app['title']) ?? app['title']) ?? '')
+      final name = (app['name'] ?? app['title'] ?? '').toString().toLowerCase();
+      final category = (app['categories'] ?? app['category'] ?? '')
           .toString()
           .toLowerCase();
-      final category =
-          (((app['categories'] ?? app['category']) ?? app['category']) ?? '')
-              .toString()
-              .toLowerCase();
-
+      final tags = (app['tags'] ?? '').toString().toLowerCase();
       final query = _searchQuery.toLowerCase();
-      String allTagsString = '';
-      if (app['tags'] != null) {
-        final tagsStr = app['tags'].toString();
-        allTagsString = tagsStr.toLowerCase();
-      }
 
       final matchesSearch =
           name.contains(query) ||
           category.contains(query) ||
-          allTagsString.contains(query);
+          tags.contains(query);
 
       final matchesCategory =
           _categoryFilter == 'All Categories' ||
@@ -215,31 +273,36 @@ class MainScreenState extends State<MainScreen> {
     }).toList();
 
     filtered.sort((a, b) {
-      final nameA = (a['name'] ?? a['title'] ?? '').toString().toLowerCase();
-      final nameB = (b['name'] ?? b['title'] ?? '').toString().toLowerCase();
-
-      if (_sortOption == 'Name (A-Z)') {
-        return nameA.compareTo(nameB);
-      } else if (_sortOption == 'Name (Z-A)') {
-        return nameB.compareTo(nameA);
-      } else if (_sortOption == 'Rating (High to Low)') {
-        final scoreA = parseRating(a['user_rating'] ?? a['rating']);
-        final scoreB = parseRating(b['user_rating'] ?? b['rating']);
-        return scoreB.compareTo(scoreA);
-      } else if (_sortOption == 'Rating (Low to High)') {
-        final scoreA = parseRating(a['user_rating'] ?? a['rating']);
-        final scoreB = parseRating(b['user_rating'] ?? b['rating']);
-        return scoreA.compareTo(scoreB);
-      } else if (_sortOption == 'Size (Large to Small)') {
-        final sizeA = getAppSize(a);
-        final sizeB = getAppSize(b);
-        return sizeB.compareTo(sizeA);
-      } else if (_sortOption == 'Size (Small to Large)') {
-        final sizeA = getAppSize(a);
-        final sizeB = getAppSize(b);
-        return sizeA.compareTo(sizeB);
+      switch (_sortOption) {
+        case 'Name (A-Z)':
+          return (a['name'] ?? a['title'] ?? '')
+              .toString()
+              .toLowerCase()
+              .compareTo(
+                (b['name'] ?? b['title'] ?? '').toString().toLowerCase(),
+              );
+        case 'Name (Z-A)':
+          return (b['name'] ?? b['title'] ?? '')
+              .toString()
+              .toLowerCase()
+              .compareTo(
+                (a['name'] ?? a['title'] ?? '').toString().toLowerCase(),
+              );
+        case 'Rating (High to Low)':
+          return parseRating(
+            b['user_rating'] ?? b['rating'],
+          ).compareTo(parseRating(a['user_rating'] ?? a['rating']));
+        case 'Rating (Low to High)':
+          return parseRating(
+            a['user_rating'] ?? a['rating'],
+          ).compareTo(parseRating(b['user_rating'] ?? b['rating']));
+        case 'Size (Large to Small)':
+          return getAppSize(b).compareTo(getAppSize(a));
+        case 'Size (Small to Large)':
+          return getAppSize(a).compareTo(getAppSize(b));
+        default:
+          return 0;
       }
-      return 0;
     });
 
     return filtered;
@@ -395,10 +458,8 @@ class MainScreenState extends State<MainScreen> {
                                   .toString();
                               if (name.toLowerCase().contains(query)) {
                                 suggestions.add(name);
-
-                                // Also suggest individual words from the app name for auto-completion inspiration
                                 final words = name.split(RegExp(r'\s+'));
-                                for (var w in words) {
+                                for (final w in words) {
                                   if (w.length > 2 &&
                                       w.toLowerCase().startsWith(query)) {
                                     suggestions.add(w);
@@ -409,27 +470,19 @@ class MainScreenState extends State<MainScreen> {
                               final categoryStr =
                                   (app['categories'] ?? app['category'] ?? '')
                                       .toString();
-                              if (categoryStr.isNotEmpty) {
-                                final cats = categoryStr
-                                    .replaceAll(RegExp(r'[\[\]"]'), '')
-                                    .split(',');
-                                for (var c in cats) {
-                                  if (c.trim().toLowerCase().contains(query)) {
-                                    suggestions.add(c.trim());
-                                  }
+                              for (final c in categoryStr.split(',')) {
+                                if (c.trim().toLowerCase().contains(query)) {
+                                  suggestions.add(c.trim());
                                 }
                               }
 
-                              final tagsStr = (app['tags'] ?? app['tag'] ?? '')
-                                  .toString();
-                              if (tagsStr.isNotEmpty) {
-                                final tags = tagsStr
-                                    .replaceAll(RegExp(r'[\[\]"]'), '')
-                                    .split(',');
-                                for (var t in tags) {
-                                  if (t.trim().toLowerCase().contains(query)) {
-                                    suggestions.add(t.trim());
-                                  }
+                              final tagsStr = (app['tags'] ?? '').toString();
+                              for (final t
+                                  in tagsStr
+                                      .replaceAll(RegExp(r'[\[\]"]'), '')
+                                      .split(',')) {
+                                if (t.trim().toLowerCase().contains(query)) {
+                                  suggestions.add(t.trim());
                                 }
                               }
                             }
@@ -708,77 +761,11 @@ class MainScreenState extends State<MainScreen> {
         separatorBuilder: (context, index) => SizedBox(height: 8),
         itemBuilder: (context, index) {
           final app = displayedApps[index];
-          final isSelected = index == _selectedMasterDetailIndex;
-
-          final isGreek = isGreekNotifier.value;
-          final desc = isGreek
-              ? (app['short_description_gr'] ?? app['description'] ?? '')
-              : (app['short_description'] ?? app['description'] ?? '');
-
-          final imgUrl = app['thumbnail_url'] ?? app['preview_photo'];
-
-          return ListTile(
-            selected: isSelected,
-            selectedTileColor: Theme.of(context).primaryColor.withAlpha(25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: app['image'] != null
-                  ? Image.network(
-                      '$_apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
-                      width: 64,
-                      height: 64,
-                      fit: BoxFit.cover,
-                      errorBuilder: (ctx, err, stack) => Container(
-                        width: 64,
-                        height: 64,
-                        color: Colors.grey.withAlpha(51),
-                        child: Icon(Icons.videogame_asset),
-                      ),
-                    )
-                  : imgUrl != null
-                  ? Image.network(
-                      imgUrl,
-                      width: 64,
-                      height: 64,
-                      fit: BoxFit.cover,
-                      errorBuilder: (ctx, err, stack) => Container(
-                        width: 64,
-                        height: 64,
-                        color: Colors.grey.withAlpha(51),
-                        child: Icon(Icons.videogame_asset),
-                      ),
-                    )
-                  : Container(
-                      width: 64,
-                      height: 64,
-                      color: Colors.grey.withAlpha(51),
-                      child: Icon(Icons.videogame_asset),
-                    ),
-            ),
-            title: Text(
-              app['name'] ?? app['title'] ?? 'Unknown',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 16,
-              ),
-            ),
-            subtitle: Text(
-              desc,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13),
-            ),
-            onTap: () {
-              setState(() {
-                _selectedMasterDetailIndex = index;
-              });
-            },
+          return _AppListTile(
+            app: app,
+            isSelected: index == _selectedMasterDetailIndex,
+            apiUrl: _apiUrl,
+            onTap: () => setState(() => _selectedMasterDetailIndex = index),
           );
         },
       ),

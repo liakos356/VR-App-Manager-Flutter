@@ -1,0 +1,26 @@
+   815	                                                color: Theme.of(
+   816	                                                  context,
+   817	                                                ).colorScheme.onPrimary,
+   818	                                              ),
+   819	                                              const SizedBox(width: 12),
+   820	                                              Flexible(
+   821	                                                child: Text(
+   822	                                                  _isInstalling
+   823	                                                      ? _installProgress >
+   824	                                                                    0.0 &&
+   825	                                                                _installProgress <
+   826	                                                                    1.0
+   827	                                                            ? '${(_installProgress * 100).toInt()}%'
+   828	                                                            : _installStatusStr
+   829	                                                      : _isInstalled
+   830	                                                      ? tr('Uninstall')
+   831	                                                      : tr('Install'),
+   832	                                                  style: TextStyle(
+   833	                                                    fontSize: 20,
+   834	                                                    fontWeight: FontWeight.bold,
+   835	                                                    color: Theme.of(
+   836	                                                      context,
+   837	                                                    ).colorScheme.onPrimary,
+   838	                                                  ),
+   839	                                                  overflow:
+   840	                                                      TextOverflow.ellipsis,

@@ -1,0 +1,18 @@
+{
+    "sourceFile": "scripts/count_dart_lines.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776436707036,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776436707036,
+            "name": "Commit-0",
+            "content": "import 'dart:io';\n\n/// Counts the number of Dart source files in lib/ that exceed the\n/// 200-line project limit. The output is used by refactor-auto.prompt.md\n/// to determine how many files to refactor in one session.\nvoid main() {\n  final dir = Directory('lib');\n  final violations = dir\n      .listSync(recursive: true)\n      .whereType<File>()\n      .where((f) => f.path.endsWith('.dart'))\n      .where((f) => f.readAsLinesSync().length > 200)\n      .toList()\n    ..sort((a, b) => b.readAsLinesSync().length.compareTo(a.readAsLinesSync().length));\n\n  for (final f in violations) {\n    stderr.writeln('  ${f.readAsLinesSync().length.toString().padLeft(5)}  ${f.path}');\n  }\n  stdout.writeln(violations.length);\n}\n"
+        }
+    ]
+}

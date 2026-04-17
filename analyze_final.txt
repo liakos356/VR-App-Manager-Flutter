@@ -1,0 +1,82 @@
+Analyzing VR-App-Manager-Flutter...                             
+
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:35:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:51:7 • avoid_print
+   info • The local variable '_getRemoteSize' starts with an underscore • lib/install_service_real.dart:56:19 • no_leading_underscores_for_local_identifiers
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:62:11 • avoid_print
+   info • The local variable '_downloadFile' starts with an underscore • lib/install_service_real.dart:67:20 • no_leading_underscores_for_local_identifiers
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:73:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:119:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:122:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:170:11 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:178:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:223:15 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:228:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:237:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:271:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:278:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/install_service_real.dart:284:7 • avoid_print
+  error • The body might complete normally, causing 'null' to be returned, but the return type, 'VrApp', is a potentially non-nullable type • lib/models/vr_app.dart:26:11 • body_might_complete_normally
+warning • The value of the local variable '<unnamed>' isn't used • lib/models/vr_app.dart:26:17 • unused_local_variable
+warning • The value of the local variable 'apkStr' isn't used • lib/models/vr_app.dart:27:11 • unused_local_variable
+warning • The value of the local variable 'shotsRaw' isn't used • lib/models/vr_app.dart:34:13 • unused_local_variable
+  error • Expected to find ';' • lib/models/vr_app.dart:34:55 • expected_token
+  error • The getter 're' isn't defined for the type 'String' • lib/models/vr_app.dart:34:55 • undefined_getter
+warning • The value of the local variable 'shotsRaw' isn't used • lib/models/vr_app.dart:34:69 • unused_local_variable
+  error • The name 'shotsRaw' is already defined • lib/models/vr_app.dart:34:69 • duplicate_definition
+  error • Expected an identifier • lib/models/vr_app.dart:34:85 • missing_identifier
+  error • Expected to find ';' • lib/models/vr_app.dart:34:85 • expected_token
+  error • Expected to find ']' • lib/models/vr_app.dart:34:85 • expected_token
+   info • An uninitialized variable should have an explicit type annotation • lib/models/vr_app.dart:34:93 • prefer_typing_uninitialized_variables
+  error • Expected an identifier • lib/models/vr_app.dart:34:93 • missing_identifier
+warning • The value of the local variable 'shotsRaw' isn't used • lib/models/vr_app.dart:34:99 • unused_local_variable
+  error • The name 'shotsRaw' is already defined • lib/models/vr_app.dart:34:99 • duplicate_definition
+  error • Expected to find ';' • lib/models/vr_app.dart:34:115 • expected_token
+  error • Unterminated string literal • lib/models/vr_app.dart:34:192 • unterminated_string_literal
+  error • Expected to find ']' • lib/models/vr_app.dart:35:7 • expected_token
+  error • Undefined class 'n' • lib/models/vr_app.dart:36:17 • undefined_class
+   info • The variable name 'VrApp' isn't a lowerCamelCase identifier • lib/models/vr_app.dart:36:19 • non_constant_identifier_names
+warning • The value of the local variable 'VrApp' isn't used • lib/models/vr_app.dart:36:19 • unused_local_variable
+  error • Expected to find ';' • lib/models/vr_app.dart:36:19 • expected_token
+  error • Expected to find ')' • lib/models/vr_app.dart:37:125 • expected_token
+  error • Expected to find ';' • lib/models/vr_app.dart:37:152 • expected_token
+  error • The getter 'toS' isn't defined for the type 'String' • lib/models/vr_app.dart:37:152 • undefined_getter
+warning • The label 's' isn't used • lib/models/vr_app.dart:37:175 • unused_label
+  error • Expected to find ';' • lib/models/vr_app.dart:37:179 • expected_token
+  error • Undefined name 'j' • lib/models/vr_app.dart:37:179 • undefined_identifier
+  error • Expected to find ')' • lib/models/vr_app.dart:37:190 • expected_token
+  error • Expected to find ';' • lib/models/vr_app.dart:37:190 • expected_token
+  error • Undefined name 's' • lib/models/vr_app.dart:37:190 • undefined_identifier
+  error • Expected to find ';' • lib/models/vr_app.dart:37:191 • expected_token
+  error • Expected an identifier • lib/models/vr_app.dart:37:212 • missing_identifier
+  error • Unexpected text ';' • lib/models/vr_app.dart:37:212 • unexpected_token
+  error • Expected an identifier • lib/models/vr_app.dart:37:214 • missing_identifier
+  error • Expected to find ';' • lib/models/vr_app.dart:37:217 • expected_token
+  error • Expected to find ';' • lib/models/vr_app.dart:37:379 • expected_token
+  error • Expected to find ';' • lib/models/vr_app.dart:37:451 • expected_token
+  error • Expected to find ']' • lib/models/vr_app.dart:37:451 • expected_token
+  error • Expected to find ']' • lib/models/vr_app.dart:37:451 • expected_token
+  error • Undefined name 'package_name' • lib/models/vr_app.dart:37:451 • undefined_identifier
+  error • Expected to find ';' • lib/models/vr_app.dart:37:470 • expected_token
+  error • Unterminated string literal • lib/models/vr_app.dart:37:483 • unterminated_string_literal
+warning • The label 'version' isn't used • lib/models/vr_app.dart:38:7 • unused_label
+  error • Expected to find ';' • lib/models/vr_app.dart:38:40 • expected_token
+warning • The label 'version' isn't used • lib/models/vr_app.dart:38:47 • unused_label
+  error • Expected to find ';' • lib/models/vr_app.dart:38:80 • expected_token
+warning • The label 'version' isn't used • lib/models/vr_app.dart:38:87 • unused_label
+  error • Undefined name 'otEmpty' • lib/models/vr_app.dart:38:96 • undefined_identifier
+warning • The value of the local variable 'get' isn't used • lib/models/vr_app.dart:39:8 • unused_local_variable
+  error • Expected to find ';' • lib/models/vr_app.dart:39:8 • expected_token
+warning • The declaration 'hasMultipleImages' isn't referenced • lib/models/vr_app.dart:39:12 • unused_element
+  error • Functions must have an explicit list of parameters • lib/models/vr_app.dart:39:30 • missing_function_parameters
+  error • Instance members can't be accessed from a factory constructor • lib/models/vr_app.dart:39:33 • instance_member_access_from_factory
+  error • Expected to find '}' • lib/models/vr_app.dart:41:1 • expected_token
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:83:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:84:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:85:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:86:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:87:9 • avoid_print
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:119:15 • avoid_print
+   info • Statements in an if should be enclosed in a block • lib/widgets/app_card.dart:119:15 • curly_braces_in_flow_control_structures
+   info • Don't invoke 'print' in production code • lib/widgets/app_card.dart:130:19 • avoid_print
+

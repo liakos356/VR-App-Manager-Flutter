@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/localization.dart';
-import 'app_card.dart';
+import 'app_detail_view.dart';
 
 class AppDetailPanel extends StatelessWidget {
   final dynamic app;
@@ -15,6 +15,6 @@ class AppDetailPanel extends StatelessWidget {
       return Center(child: Text(tr('Select an app to see details')));
     }
 
-    return AppCard(app: app, apiUrl: apiUrl, isDetailView: true);
+    return AppDetailView(app: app, apiUrl: apiUrl, showAsPage: false);
   }
 }

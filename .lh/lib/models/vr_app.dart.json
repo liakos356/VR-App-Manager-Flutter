@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/models/vr_app.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776436707036,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776436707036,
+            "name": "Commit-0",
+            "content": "class VrApp {\n  final String id;\n  final String title;\n  final String description;\n  final String genres;\n  final String apkPath;\n  final String obbDir;\n  final bool ovrport;\n  final List<String> images;\n  final String packageName;\n  final String version;\n\n  const VrApp({\n    required this.id,\n    required this.title,\n    required this.description,\n    required this.genres,\n    required this.apkPath,\n    required this.obbDir,\n    required this.ovrport,\n    required this.images,\n    required this.packageName,\n    required this.version,\n  });\n\n  factory VrApp.fromJson(Map<String, dynamic> json) {\n    final apkStr = (json['apk_path'] ?? '').toString().trim();\n    final imagesList = <String>[];\n    \n    final preview = json['preview_photo']?.toString();\n    if (preview != null && preview.isNotEmpty) {\n      imagesList.add(preview);\n    }\n    \n    if (json['screenshots'] != null) {\n      final shotsRaw = json['screenshots'].toString().replaceAll('[', '').replaceAll(']', '').replaceAll('\"', '').split(',');\n      for (var s in shotsRaw) {\n        if (s.trim().isNotEmpty) {\n          imagesList.add(s.trim());\n        }\n      }\n    }\n\n    return VrApp(\n      id: (json['id'] ?? '').toString(),\n      title: (json['name'] ?? json['title'] ?? '').toString(),\n      description: (json['description'] ?? '').toString(),\n      genres: (json['genres'] ?? json['category'] ?? '').toString(),\n      apkPath: apkStr,\n      obbDir: (json['obb_dir'] ?? '').toString(),\n      ovrport: json['ovrport'] == 1 || json['ovrport'] == 'true' || json['ovrport'] == true,\n      images: imagesList,\n      packageName: (json['package_name'] ?? '').toString(),\n      version: (json['version'] ?? '').toString(),\n    );\n  }\n\n  bool get hasApk => apkPath.isNotEmpty;\n  bool get hasMultipleImages => images.length > 1;\n}"
+        }
+    ]
+}

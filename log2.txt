@@ -1,0 +1,31 @@
+   360	                                      },
+   361	                                child: Center(
+   362	                                  child: Text(
+   363	                                    isInstallingLocal
+   364	                                        ? installProgressLocal > 0.0 &&
+   365	                                                  installProgressLocal < 1.0
+   366	                                              ? '${(installProgressLocal * 100).toInt()}%'
+   367	                                              : installStatusLocal
+   368	                                        : _isInstalled
+   369	                                        ? 'Uninstall'
+   370	                                        : 'Install',
+   371	                                    textAlign: TextAlign.center,
+   372	                                    style: TextStyle(
+   373	                                      color: Colors.white,
+   374	                                      fontWeight: FontWeight.bold,
+   375	                                      fontSize: 18,
+   376	                                    ),
+   377	                                  ),
+   378	                                ),
+   379	                              ),
+   380	                            ),
+   381	                          ],
+   382	                        ),
+   383	                      ),
+   384	                    ],
+   385	                  ),
+   386	                ],
+   387	              ),
+   388	            );
+   389	          },
+   390	        );

@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776341159275,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776436707306,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,8 +1,8 @@\n import 'package:flutter/material.dart';\n \n import '../utils/localization.dart';\n-import 'app_card.dart';\n+import 'app_detail_view.dart';\n \n class AppDetailPanel extends StatelessWidget {\n   final dynamic app;\n   final String apiUrl;\n@@ -14,7 +14,7 @@\n     if (app == null) {\n       return Center(child: Text(tr('Select an app to see details')));\n     }\n \n-    return AppCard(app: app, apiUrl: apiUrl, isDetailView: true);\n+    return AppDetailView(app: app, apiUrl: apiUrl, showAsPage: false);\n   }\n }\n"
                 }
             ],
             "date": 1776341159275,

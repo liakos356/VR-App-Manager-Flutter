@@ -1,0 +1,18 @@
+{
+    "sourceFile": "fix_categories.py",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776436707035,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776436707035,
+            "name": "Commit-0",
+            "content": "import os\nimport re\n\nfiles = [\n    'lib/screens/main_screen.dart',\n    'lib/widgets/app_card.dart',\n    'lib/widgets/app_detail_panel.dart'\n]\n\nfor file_path in files:\n    if not os.path.exists(file_path): continue\n    with open(file_path, 'r') as f:\n        content = f.read()\n\n    # Replacing all category variables appropriately\n    content = content.replace(\"app['categories'] ?? app['category'] ?? app['category']\", \"app['genres']\")\n    content = content.replace(\"app['category'] ?? app['categories']\", \"app['genres']\")\n    content = content.replace(\"app['categories'] ?? app['category']\", \"app['genres']\")\n    content = content.replace(\"All Categories\", \"All Genres\")\n    content = content.replace(\"_categoryFilter\", \"_genreFilter\")\n    content = content.replace(\"_availableCategories\", \"_availableGenres\")\n    content = content.replace(\"_getCategoryCount\", \"_getGenreCount\")\n    content = content.replace(\"matchesCategory\", \"matchesGenre\")\n    content = content.replace(\"category = ((app\", \"genre = ((app\")\n    content = content.replace(\"category.contains\", \"genre.contains\")\n    content = content.replace(\"Icons.category\", \"Icons.category\") # leave this\n    content = content.replace(\"label: 'Category',\", \"label: 'Genre',\")\n\n    # In app details / card\n    content = content.replace(\"widget.app['category'] ?? widget.app['categories']\", \"widget.app['genres']\")\n    content = re.sub(r\"widget\\.app\\[\\'categories\\'\\]\\s*\\?\\?\\s*widget\\.app\\[\\'category\\'\\]\\s*\\?\\?\\s*widget\\.app\\[\\'category\\'\\]\", \"widget.app['genres']\", content)\n    content = re.sub(r\"widget\\.app\\[\\'categories\\'\\]\\s*\\?\\?\\s*widget\\.app\\[\\'category\\'\\]\", \"widget.app['genres']\", content)\n    content = content.replace(\"app['category'] ?? ''\", \"app['genres'] ?? ''\")\n    \n    with open(file_path, 'w') as f:\n        f.write(content)\n"
+        }
+    ]
+}
