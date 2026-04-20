@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import 'app_detail_view.dart';
-import 'card_image_carousel.dart';
 import 'install_bottom_sheet.dart';
 import 'star_rating.dart';
 
@@ -18,7 +17,16 @@ class AppCard extends StatefulWidget {
   final dynamic app;
   final String apiUrl;
 
-  const AppCard({super.key, required this.app, required this.apiUrl});
+  // TODO(legacy): isDetailView is no longer used; callers should migrate to
+  // AppDetailView directly.  Kept here to avoid breaking existing call-sites.
+  final bool isDetailView;
+
+  const AppCard({
+    super.key,
+    required this.app,
+    required this.apiUrl,
+    this.isDetailView = false,
+  });
 
   @override
   State<AppCard> createState() => AppCardState();
@@ -29,22 +37,12 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
   int _currentImageIndex = 0;
   bool _isInstalled = false;
   String _installedPackageName = '';
-  late List<String> _images;
 
   @override
   void initState() {
     super.initState();
-    _images = _parseImages(widget.app);
     WidgetsBinding.instance.addObserver(this);
     _refreshInstallState();
-  }
-
-  @override
-  void didUpdateWidget(AppCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.app != widget.app) {
-      _images = _parseImages(widget.app);
-    }
   }
 
   @override
@@ -68,16 +66,15 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
     }
   }
 
-  /// Parses the app map into an ordered list of image URLs.
-  /// Kept as a static helper so it can be called from [initState] and
-  /// [didUpdateWidget] without allocating a getter closure on each build.
-  static List<String> _parseImages(dynamic app) {
+  List<String> get _allImages {
     final images = <String>[];
-    final hero = (app['thumbnail_url'] ?? app['preview_photo'])?.toString();
+    final hero =
+        (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
+            ?.toString();
     if (hero != null && hero.isNotEmpty) images.add(hero);
-    if (app['screenshots'] != null) {
+    if (widget.app['screenshots'] != null) {
       try {
-        final decoded = jsonDecode(app['screenshots'].toString());
+        final decoded = jsonDecode(widget.app['screenshots'].toString());
         if (decoded is List) {
           images.addAll(
             decoded.map((e) => e.toString()).where((e) => e.isNotEmpty),
@@ -112,20 +109,46 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isOvrport =
-        widget.app['ovrport'] == 1 ||
+    // Legacy support: callers that pass isDetailView=true get AppDetailView.
+    if (widget.isDetailView) {
+      return AppDetailView(
+          app: widget.app, apiUrl: widget.apiUrl, showAsPage: false);
+    }
+
+    final images = _allImages;
+    final isOvrport = widget.app['ovrport'] == 1 ||
         widget.app['ovrport'] == true ||
         widget.app['ovrport'] == '1' ||
         widget.app['ovrport'] == 'true';
 
+    final apkPath = widget.app['apk_path']?.toString().trim();
+    final isUnavailable = apkPath == null || apkPath.isEmpty;
+
     return RepaintBoundary(
-      child: Card(
-        elevation: 6,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: MouseRegion(
+      child: Opacity(
+        opacity: isUnavailable ? 0.70 : 1.0,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: _isHovered ? 1.0 : 0.0),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          builder: (context, t, child) {
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..translateByDouble(0.0, -8.0 * t, 0.0, 1.0)
+                ..scaleByDouble(1.0 + 0.03 * t, 1.0 + 0.03 * t, 1.0, 1.0),
+              child: child,
+            );
+          },
+          child: Card(
+          elevation: _isHovered ? 18 : 6,
+          clipBehavior: Clip.antiAlias,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
+          cursor: SystemMouseCursors.click,
           child: InkWell(
             onTap: () => _showDetails(context),
             onLongPress: () => showInstallBottomSheet(
@@ -135,6 +158,9 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
               installedPackageName: _installedPackageName,
               onInstallDone: _refreshInstallState,
             ),
+            splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+            highlightColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+            hoverColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -144,30 +170,27 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _images.isNotEmpty
-                          ? CardImageCarousel(
-                              images: _images,
+                      images.isNotEmpty
+                          ? _CardImageCarousel(
+                              images: images,
                               currentIndex: _currentImageIndex,
                               isHovered: _isHovered,
-                              hasMultiple: _images.length > 1,
+                              hasMultiple: images.length > 1,
                               onPrev: () => setState(() {
                                 _currentImageIndex =
-                                    (_currentImageIndex - 1 + _images.length) %
-                                    _images.length;
+                                    (_currentImageIndex - 1 + images.length) %
+                                        images.length;
                               }),
                               onNext: () => setState(() {
                                 _currentImageIndex =
-                                    (_currentImageIndex + 1) % _images.length;
+                                    (_currentImageIndex + 1) % images.length;
                               }),
                             )
                           : Container(
                               color: Colors.grey[800],
                               child: const Center(
-                                child: Icon(
-                                  Icons.vrpano,
-                                  size: 64,
-                                  color: Colors.white54,
-                                ),
+                                child: Icon(Icons.vrpano,
+                                    size: 64, color: Colors.white54),
                               ),
                             ),
                       if (isOvrport)
@@ -176,9 +199,7 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                           right: 12,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.redAccent.withValues(alpha: 0.9),
                               borderRadius: BorderRadius.circular(6),
@@ -187,6 +208,27 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                               'Ovrport',
                               style: TextStyle(
                                 color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (isUnavailable)
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[800]!.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Unavailable',
+                              style: TextStyle(
+                                color: Colors.white70,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -247,24 +289,22 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                             Expanded(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
+                                    horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.15),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: AutoSizeText(
                                   (widget.app['genres'] ??
-                                          widget.app['category'] ??
-                                          '')
-                                      as String,
+                                      widget.app['category'] ??
+                                      '') as String,
                                   style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -291,7 +331,89 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
               ],
             ),
           ),
+          ),
         ),
+      ),      // TweenAnimationBuilder
+      ),      // Opacity
+    );
+  }
+}
+
+// ── Private helpers ───────────────────────────────────────────────────────────
+
+/// Image strip with hover-activated prev/next navigation and dot indicators.
+class _CardImageCarousel extends StatelessWidget {
+  final List<String> images;
+  final int currentIndex;
+  final bool isHovered;
+  final bool hasMultiple;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+
+  const _CardImageCarousel({
+    required this.images,
+    required this.currentIndex,
+    required this.isHovered,
+    required this.hasMultiple,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          images[currentIndex],
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: Colors.grey[800],
+            child: const Center(
+                child: Icon(Icons.vrpano, size: 64, color: Colors.white54)),
+          ),
+        ),
+        if (isHovered && hasMultiple) ...[
+          Positioned.fill(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _navButton(icon: Icons.chevron_left, onPressed: onPrev),
+                _navButton(icon: Icons.chevron_right, onPressed: onNext),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 8,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(images.length, (i) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  width: currentIndex == i ? 8 : 6,
+                  height: currentIndex == i ? 8 : 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: currentIndex == i ? Colors.white : Colors.white54,
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _navButton({required IconData icon, required VoidCallback onPressed}) {
+    return IconButton(
+      icon: Icon(icon, color: Colors.white, size: 32),
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.black45,
+        shape: const CircleBorder(),
       ),
     );
   }

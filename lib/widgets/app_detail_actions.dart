@@ -9,40 +9,60 @@ import 'video_dialog.dart';
 class AppDetailInstallButton extends StatelessWidget {
   final bool isInstalled;
   final bool isInstalling;
+  final bool isAvailable;
   final double installProgress;
   final String installStatus;
   final VoidCallback? onTap;
+  final bool compact;
 
   const AppDetailInstallButton({
     super.key,
     required this.isInstalled,
     required this.isInstalling,
+    required this.isAvailable,
     required this.installProgress,
     required this.installStatus,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isInstalling
-        ? Colors.grey.shade800
-        : (isInstalled
-              ? Colors.red.shade600
-              : Theme.of(context).colorScheme.primary);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final label = isInstalling
+    final bgColor = !isAvailable
+        ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
+        : isInstalling
+        ? Colors.grey.shade800
+        : isInstalled
+        ? Colors.red.shade600
+        : Theme.of(context).colorScheme.primary;
+
+    final contentColor = !isAvailable
+        ? (isDark ? Colors.white30 : Colors.black26)
+        : Theme.of(context).colorScheme.onPrimary;
+
+    final label = !isAvailable
+        ? tr('Unavailable')
+        : isInstalling
         ? (installProgress > 0.0 && installProgress < 1.0
               ? '${(installProgress * 100).toInt()}%'
               : installStatus)
         : (isInstalled ? tr('Uninstall') : tr('Install'));
 
+    final double btnHeight = compact ? 48 : 64;
+    final double hPad = compact ? 20 : 36;
+    final double vPad = compact ? 12 : 18;
+    final double iconSize = compact ? 20 : 24;
+    final double fontSize = compact ? 15 : 18;
+
     return Container(
-      height: 72,
-      constraints: const BoxConstraints(minWidth: 200),
+      height: btnHeight,
+      constraints: BoxConstraints(minWidth: compact ? 120 : 180),
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(compact ? 12 : 16),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -65,26 +85,26 @@ class AppDetailInstallButton extends StatelessWidget {
             child: InkWell(
               onTap: onTap,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 48,
-                  vertical: 24,
+                padding: EdgeInsets.symmetric(
+                  horizontal: hPad,
+                  vertical: vPad,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       isInstalling ? Icons.downloading : Icons.download,
-                      size: 28,
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      size: iconSize,
+                      color: contentColor,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: fontSize,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimary,
+                          color: contentColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -103,7 +123,8 @@ class AppDetailInstallButton extends StatelessWidget {
 /// Button that opens the YouTube trailer or a generic video dialog.
 class AppDetailTrailerButton extends StatelessWidget {
   final String videoUrl;
-  const AppDetailTrailerButton({super.key, required this.videoUrl});
+  final bool compact;
+  const AppDetailTrailerButton({super.key, required this.videoUrl, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -126,16 +147,16 @@ class AppDetailTrailerButton extends StatelessWidget {
           );
         }
       },
-      icon: const Icon(Icons.play_circle_fill, size: 28),
+      icon: Icon(Icons.play_circle_fill, size: compact ? 20 : 24),
       label: Text(
         tr('Watch Trailer'),
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        style: TextStyle(fontSize: compact ? 15 : 18, fontWeight: FontWeight.bold),
       ),
       style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 28, vertical: compact ? 12 : 18),
         backgroundColor: Theme.of(context).colorScheme.secondary,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(compact ? 12 : 16)),
       ),
     );
   }

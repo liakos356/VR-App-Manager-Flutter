@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776438923485,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776691425886,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -15,9 +15,9 @@\n   final VoidCallback onGenreToggle;\n   final VoidCallback onClearGenre;\n   final ValueChanged<String> onViewModeChanged;\n   final ValueChanged<String?> onSortChanged;\n-  \n+\n   // New properties for Installed Apps toggle\n   final bool showInstalledApps;\n   final ValueChanged<bool> onToggleInstalledApps;\n \n@@ -46,9 +46,11 @@\n         children: [\n           // ── Genre sidebar toggle ──────────────────────────────────────\n           if (!showInstalledApps)\n             Tooltip(\n-              message: genreSidebarOpen ? 'Hide genre panel' : 'Show genre panel',\n+              message: genreSidebarOpen\n+                  ? 'Hide genre panel'\n+                  : 'Show genre panel',\n               child: Material(\n                 elevation: genreSidebarOpen ? 3 : 2,\n                 borderRadius: BorderRadius.circular(20),\n                 color: genreSidebarOpen\n@@ -79,9 +81,11 @@\n                                 ? FontWeight.w600\n                                 : FontWeight.w500,\n                             color: genreSidebarOpen\n                                 ? Theme.of(context).colorScheme.onPrimary\n-                                : Theme.of(context).colorScheme.onSurfaceVariant,\n+                                : Theme.of(\n+                                    context,\n+                                  ).colorScheme.onSurfaceVariant,\n                           ),\n                         ),\n                         const SizedBox(width: 4),\n                         Icon(\n@@ -149,9 +153,11 @@\n                 foregroundColor: Theme.of(context).brightness == Brightness.dark\n                     ? Colors.white.withValues(alpha: 0.7)\n                     : Colors.black.withValues(alpha: 0.6),\n                 selectedBackgroundColor: Theme.of(context).colorScheme.primary,\n-                selectedForegroundColor: Theme.of(context).colorScheme.onPrimary,\n+                selectedForegroundColor: Theme.of(\n+                  context,\n+                ).colorScheme.onPrimary,\n               ),\n               segments: [\n                 ButtonSegment(\n                   value: 'grid',\n"
                 }
             ],
             "date": 1776438923485,

@@ -33,6 +33,11 @@ class FilterDropdown extends StatelessWidget {
               child: DropdownButton<String>(
                 value: value,
                 icon: const Icon(Icons.arrow_drop_down, size: 20),
+                dropdownColor: Theme.of(context).cardColor,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  fontSize: 14,
+                ),
                 items: items,
                 onChanged: onChanged,
               ),

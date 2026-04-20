@@ -3,35 +3,36 @@ import 'package:flutter/material.dart';
 import '../utils/localization.dart';
 import '../widgets/filter_dropdown.dart';
 
-/// AppBar bottom bar with category filter, ovrport toggle, view-mode toggle,
-/// and sort dropdown.
+/// AppBar bottom bar with view-mode toggle and sort dropdown.
 ///
 /// Implements [PreferredSizeWidget] so it can be passed directly to
 /// [AppBar.bottom].
 class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
-  final String categoryFilter;
-  final List<String> availableCategories;
-  final int Function(String) getCategoryCount;
-  final bool ovrportFilter;
   final String viewMode;
   final String sortOption;
-  final ValueChanged<String?> onCategoryChanged;
-  final ValueChanged<bool> onOvrportChanged;
+  final bool genreSidebarOpen;
+  final String genreFilter;
+  final VoidCallback onGenreToggle;
+  final VoidCallback onClearGenre;
   final ValueChanged<String> onViewModeChanged;
   final ValueChanged<String?> onSortChanged;
 
+  // New properties for Installed Apps toggle
+  final bool showInstalledApps;
+  final ValueChanged<bool> onToggleInstalledApps;
+
   const MainFilterBar({
     super.key,
-    required this.categoryFilter,
-    required this.availableCategories,
-    required this.getCategoryCount,
-    required this.ovrportFilter,
     required this.viewMode,
     required this.sortOption,
-    required this.onCategoryChanged,
-    required this.onOvrportChanged,
+    required this.genreSidebarOpen,
+    required this.genreFilter,
+    required this.onGenreToggle,
+    required this.onClearGenre,
     required this.onViewModeChanged,
     required this.onSortChanged,
+    this.showInstalledApps = false,
+    required this.onToggleInstalledApps,
   });
 
   @override
@@ -43,94 +44,212 @@ class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
         children: [
-          FilterDropdown(
-            value: categoryFilter,
-            icon: Icons.category,
-            items: availableCategories.map((String category) {
-              final count = getCategoryCount(category);
-              return DropdownMenuItem<String>(
-                value: category,
-                child: Text(
-                  category == 'All Categories'
-                      ? category
-                      : '$category ($count)',
+          // ── Genre sidebar toggle ──────────────────────────────────────
+          if (!showInstalledApps)
+            Tooltip(
+              message: genreSidebarOpen
+                  ? 'Hide genre panel'
+                  : 'Show genre panel',
+              child: Material(
+                elevation: genreSidebarOpen ? 3 : 2,
+                borderRadius: BorderRadius.circular(20),
+                color: genreSidebarOpen
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).cardColor,
+                child: InkWell(
+                  onTap: onGenreToggle,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.label_outline_rounded,
+                          size: 16,
+                          color: genreSidebarOpen
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Genres',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: genreSidebarOpen
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: genreSidebarOpen
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          genreSidebarOpen
+                              ? Icons.keyboard_arrow_left_rounded
+                              : Icons.keyboard_arrow_right_rounded,
+                          size: 14,
+                          color: genreSidebarOpen
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              );
-            }).toList(),
-            onChanged: onCategoryChanged,
-          ),
-          const SizedBox(width: 16),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                tr('Ovrport Only'),
-                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
-              const SizedBox(width: 4),
-              Switch(value: ovrportFilter, onChanged: onOvrportChanged),
-            ],
-          ),
-          const Spacer(),
-          SegmentedButton<String>(
-            style: SegmentedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor.withAlpha(20),
-              selectedBackgroundColor: Theme.of(
-                context,
-              ).primaryColor.withAlpha(40),
-              selectedForegroundColor: Theme.of(context).primaryColor,
             ),
-            segments: [
+          if (!showInstalledApps && genreFilter != 'All Genres') ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Clear genre filter',
+              child: Material(
+                elevation: 0,
+                borderRadius: BorderRadius.circular(20),
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onClearGenre,
+                  borderRadius: BorderRadius.circular(20),
+                  hoverColor: Colors.red.withValues(alpha: 0.12),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.45),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 15,
+                      color: Colors.red.shade400,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
+
+          if (!showInstalledApps) ...[
+            SegmentedButton<String>(
+              style: SegmentedButton.styleFrom(
+                elevation: 2,
+                side: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.08),
+                  width: 1,
+                ),
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06),
+                foregroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : Colors.black.withValues(alpha: 0.6),
+                selectedBackgroundColor: Theme.of(context).colorScheme.primary,
+                selectedForegroundColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimary,
+              ),
+              segments: [
+                ButtonSegment(
+                  value: 'grid',
+                  icon: Tooltip(
+                    message: tr('Grid View'),
+                    child: const Icon(Icons.grid_view),
+                  ),
+                ),
+                ButtonSegment(
+                  value: 'master_detail',
+                  icon: Tooltip(
+                    message: tr('Master Detail'),
+                    child: const Icon(Icons.vertical_split),
+                  ),
+                ),
+              ],
+              selected: {viewMode},
+              onSelectionChanged: (Set<String> sel) =>
+                  onViewModeChanged(sel.first),
+            ),
+            const SizedBox(width: 16),
+            FilterDropdown(
+              value: sortOption,
+              icon: Icons.sort,
+              items: [
+                DropdownMenuItem(
+                  value: 'Name (A-Z)',
+                  child: Text(tr('Name (A-Z)')),
+                ),
+                DropdownMenuItem(
+                  value: 'Name (Z-A)',
+                  child: Text(tr('Name (Z-A)')),
+                ),
+                DropdownMenuItem(
+                  value: 'Rating (High to Low)',
+                  child: Text(tr('Rating (High to Low)')),
+                ),
+                DropdownMenuItem(
+                  value: 'Rating (Low to High)',
+                  child: Text(tr('Rating (Low to High)')),
+                ),
+                DropdownMenuItem(
+                  value: 'Size (Large to Small)',
+                  child: Text(tr('Size (Large to Small)')),
+                ),
+                DropdownMenuItem(
+                  value: 'Size (Small to Large)',
+                  child: Text(tr('Size (Small to Large)')),
+                ),
+              ],
+              onChanged: onSortChanged,
+            ),
+            const SizedBox(width: 16),
+          ],
+
+          SegmentedButton<bool>(
+            style: SegmentedButton.styleFrom(
+              elevation: 2,
+              side: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : Colors.black.withValues(alpha: 0.08),
+                width: 1,
+              ),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.06),
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.7)
+                  : Colors.black.withValues(alpha: 0.6),
+              selectedBackgroundColor: Theme.of(context).colorScheme.primary,
+              selectedForegroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
+            segments: const [
               ButtonSegment(
-                value: 'grid',
+                value: false,
                 icon: Tooltip(
-                  message: tr('Grid View'),
-                  child: const Icon(Icons.grid_view),
+                  message: 'Store Apps',
+                  child: Icon(Icons.storefront),
                 ),
               ),
               ButtonSegment(
-                value: 'master_detail',
+                value: true,
                 icon: Tooltip(
-                  message: tr('Master Detail'),
-                  child: const Icon(Icons.vertical_split),
+                  message: 'Installed Apps',
+                  child: Icon(Icons.install_mobile),
                 ),
               ),
             ],
-            selected: {viewMode},
-            onSelectionChanged: (Set<String> sel) =>
-                onViewModeChanged(sel.first),
-          ),
-          const SizedBox(width: 16),
-          FilterDropdown(
-            value: sortOption,
-            icon: Icons.sort,
-            items: [
-              DropdownMenuItem(
-                value: 'Name (A-Z)',
-                child: Text(tr('Name (A-Z)')),
-              ),
-              DropdownMenuItem(
-                value: 'Name (Z-A)',
-                child: Text(tr('Name (Z-A)')),
-              ),
-              DropdownMenuItem(
-                value: 'Rating (High to Low)',
-                child: Text(tr('Rating (High to Low)')),
-              ),
-              DropdownMenuItem(
-                value: 'Rating (Low to High)',
-                child: Text(tr('Rating (Low to High)')),
-              ),
-              DropdownMenuItem(
-                value: 'Size (Large to Small)',
-                child: Text(tr('Size (Large to Small)')),
-              ),
-              DropdownMenuItem(
-                value: 'Size (Small to Large)',
-                child: Text(tr('Size (Small to Large)')),
-              ),
-            ],
-            onChanged: onSortChanged,
+            selected: {showInstalledApps},
+            onSelectionChanged: (Set<bool> sel) =>
+                onToggleInstalledApps(sel.first),
           ),
         ],
       ),

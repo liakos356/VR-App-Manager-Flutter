@@ -26,6 +26,8 @@ class AppListTile extends StatelessWidget {
         ? (app['short_description_gr'] ?? app['description'] ?? '')
         : (app['short_description'] ?? app['description'] ?? '');
     final imgUrl = app['thumbnail_url'] ?? app['preview_photo'];
+    final apkPath = app['apk_path']?.toString().trim();
+    final isUnavailable = apkPath == null || apkPath.isEmpty;
 
     final Widget leadingImage;
     if (app['image'] != null) {
@@ -48,7 +50,9 @@ class AppListTile extends StatelessWidget {
       leadingImage = _placeholder();
     }
 
-    return ListTile(
+    return Opacity(
+      opacity: isUnavailable ? 0.70 : 1.0,
+      child: ListTile(
       selected: isSelected,
       selectedTileColor: Theme.of(context).primaryColor.withAlpha(25),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -57,14 +61,37 @@ class AppListTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: leadingImage,
       ),
-      title: Text(
-        app['name'] ?? app['title'] ?? 'Unknown',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 16,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              app['name'] ?? app['title'] ?? 'Unknown',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          if (isUnavailable)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey[700],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Unavailable',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
       ),
       subtitle: Text(
         desc,
@@ -73,6 +100,7 @@ class AppListTile extends StatelessWidget {
         style: const TextStyle(fontSize: 13),
       ),
       onTap: onTap,
+      ),
     );
   }
 

@@ -193,10 +193,29 @@ class _AppDetailViewState extends State<AppDetailView>
 
   @override
   Widget build(BuildContext context) {
-    final body = Row(
+    if (widget.showAsPage) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(_appName),
+        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: _buildWideBody(context),
+      );
+    }
+    return _buildPanelBody(context);
+  }
+
+  // ── Full-screen two-column layout (used when pushed as a page) ────────────
+
+  Widget _buildWideBody(BuildContext context) {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Left: hero image + screenshots ──────────────────────────────────
+        // Left: hero image + screenshots
         Expanded(
           flex: 4,
           child: Padding(
@@ -233,7 +252,7 @@ class _AppDetailViewState extends State<AppDetailView>
           ),
         ),
 
-        // ── Right: metadata + install ────────────────────────────────────────
+        // Right: metadata + install
         Expanded(
           flex: 6,
           child: Column(
@@ -244,15 +263,16 @@ class _AppDetailViewState extends State<AppDetailView>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title + size
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             _appName,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 40,
+                              fontSize: 32,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -263,7 +283,7 @@ class _AppDetailViewState extends State<AppDetailView>
                                     'Size: ${formatBytes(getAppSize(widget.app))}'
                                     '${getObbSize(widget.app) > 0 ? '\n(APK: ${formatBytes(getApkSize(widget.app))} + OBB: ${formatBytes(getObbSize(widget.app))})' : ''}',
                                     style: TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       color: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -277,19 +297,19 @@ class _AppDetailViewState extends State<AppDetailView>
                       ),
                     ),
                     const SizedBox(width: 16),
-                    // Install button + trailer
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         AppDetailInstallButton(
                           isInstalled: _isInstalled,
                           isInstalling: _isInstalling,
+                          isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
                           installProgress: _installProgress,
                           installStatus: _installStatus,
-                          onTap: _isInstalling ? null : _handleInstallTap,
+                          onTap: _isInstalling || (widget.app['apk_path']?.toString().trim().isEmpty ?? true) ? null : _handleInstallTap,
                         ),
                         if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           AppDetailTrailerButton(videoUrl: _videoUrl!),
                         ],
                       ],
@@ -297,36 +317,31 @@ class _AppDetailViewState extends State<AppDetailView>
                   ],
                 ),
               ),
-
-              // Scrollable metadata
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(40, 20, 40, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Genre badge
                       BadgeChip(
                         label: _genre.isEmpty ? 'Category' : _genre,
                         color: Theme.of(context).colorScheme.primary,
                       ),
-                      // Ovrport + rating row
                       RatingRow(isOvrport: _isOvrport, rating: _rating),
-                      // Tags
                       if (_tags.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         TagChips(tags: _tags),
                       ],
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 40),
                       Text(
                         tr('Description'),
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _DescriptionBox(app: widget.app), // stays local
+                      _DescriptionBox(app: widget.app),
                     ],
                   ),
                 ),
@@ -336,21 +351,122 @@ class _AppDetailViewState extends State<AppDetailView>
         ),
       ],
     );
+  }
 
-    if (widget.showAsPage) {
-      return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
+  // ── Compact single-column layout (used inside the split panel) ────────────
+
+  Widget _buildPanelBody(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hero image — full width, compact height
+          AppDetailHeroImage(url: _heroUrl, height: 200),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                Text(
+                  _appName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (getAppSize(widget.app) > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Size: ${formatBytes(getAppSize(widget.app))}'
+                    '${getObbSize(widget.app) > 0 ? '  (APK: ${formatBytes(getApkSize(widget.app))} + OBB: ${formatBytes(getObbSize(widget.app))})' : ''}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.color
+                          ?.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+
+                // Action buttons — side by side
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppDetailInstallButton(
+                        isInstalled: _isInstalled,
+                        isInstalling: _isInstalling,
+                        isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
+                        installProgress: _installProgress,
+                        installStatus: _installStatus,
+                        onTap: _isInstalling || (widget.app['apk_path']?.toString().trim().isEmpty ?? true) ? null : _handleInstallTap,
+                        compact: true,
+                      ),
+                    ),
+                    if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: AppDetailTrailerButton(
+                          videoUrl: _videoUrl!,
+                          compact: true,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Genre + rating + tags
+                BadgeChip(
+                  label: _genre.isEmpty ? 'Category' : _genre,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                RatingRow(isOvrport: _isOvrport, rating: _rating),
+                if (_tags.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  TagChips(tags: _tags),
+                ],
+                const SizedBox(height: 20),
+
+                // Description
+                Text(
+                  tr('Description'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _DescriptionBox(app: widget.app),
+
+                // Screenshots
+                if (_screenshots.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    tr('Screenshots'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: AppDetailScreenshotGrid(screenshots: _screenshots),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-          title: Text(_appName),
-        ),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: body,
-      );
-    }
-    return body;
+        ],
+      ),
+    );
   }
 }
 

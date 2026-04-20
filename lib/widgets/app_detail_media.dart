@@ -5,7 +5,8 @@ import 'fullscreen_image_viewer.dart';
 /// Hero banner image for the app detail view.
 class AppDetailHeroImage extends StatelessWidget {
   final String? url;
-  const AppDetailHeroImage({super.key, this.url});
+  final double height;
+  const AppDetailHeroImage({super.key, this.url, this.height = 350});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +16,7 @@ class AppDetailHeroImage extends StatelessWidget {
         child: Image.network(
           url!,
           width: double.infinity,
-          height: 350,
+          height: height,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => _placeholder(),
         ),
@@ -26,7 +27,7 @@ class AppDetailHeroImage extends StatelessWidget {
 
   Widget _placeholder() => Container(
     width: double.infinity,
-    height: 350,
+    height: height,
     decoration: BoxDecoration(
       color: Colors.grey[800],
       borderRadius: BorderRadius.circular(16),

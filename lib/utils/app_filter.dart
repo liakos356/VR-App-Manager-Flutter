@@ -4,37 +4,46 @@ import 'formatters.dart';
 /// [MainScreen].  All functions are stateless and side-effect-free so they
 /// are trivially testable.
 
-// ── Category helpers ──────────────────────────────────────────────────────────
+// ── Genre helpers ─────────────────────────────────────────────────────────────
 
-/// Returns the sorted set of categories present across [apps], always
-/// starting with "All Categories".
-List<String> availableCategories(List<dynamic> apps) {
-  final categories = <String>{'All Categories'};
+/// Extracts individual genre tokens from an app's genre/category string.
+/// Handles both space-separated hashtag strings ("#Action #Adventure") and
+/// comma-separated strings.
+List<String> _parseGenres(String raw) {
+  return raw
+      .split(RegExp(r'[,\s]+'))
+      .map((g) => g.trim())
+      .where((g) => g.isNotEmpty)
+      .toList();
+}
+
+String _genreRaw(dynamic app) =>
+    (app['genres'] ?? app['categories'] ?? app['category'] ?? '').toString();
+
+/// Returns the sorted set of individual genres present across [apps], always
+/// starting with "All Genres".
+List<String> availableGenres(List<dynamic> apps) {
+  final genres = <String>{'All Genres'};
   for (final app in apps) {
-    final catString = (app['categories'] ?? app['category'] ?? '').toString();
-    for (final c in catString.split(',')) {
-      final trimmed = c.trim();
-      if (trimmed.isNotEmpty) categories.add(trimmed);
+    for (final g in _parseGenres(_genreRaw(app))) {
+      genres.add(g);
     }
   }
-  return categories.toList()..sort((a, b) {
-    if (a == 'All Categories') return -1;
-    if (b == 'All Categories') return 1;
+  return genres.toList()..sort((a, b) {
+    if (a == 'All Genres') return -1;
+    if (b == 'All Genres') return 1;
     return a.compareTo(b);
   });
 }
 
-/// Count of apps that belong to [category].
-int categoryCount(List<dynamic> apps, String category) {
-  if (category == 'All Categories') return apps.length;
-  final catLower = category.toLowerCase();
+/// Count of apps that have [genre] as one of their individual genres.
+int genreCount(List<dynamic> apps, String genre) {
+  if (genre == 'All Genres') return apps.length;
+  final genreLower = genre.toLowerCase();
   int count = 0;
   for (final app in apps) {
-    final cats = (app['categories'] ?? app['category'] ?? '')
-        .toString()
-        .toLowerCase()
-        .split(',');
-    if (cats.any((c) => c.trim() == catLower)) count++;
+    final appGenres = _parseGenres(_genreRaw(app).toLowerCase());
+    if (appGenres.any((g) => g == genreLower)) count++;
   }
   return count;
 }
@@ -55,32 +64,33 @@ List<String> availableAppTypes(List<dynamic> apps) {
 
 // ── Filter + sort ─────────────────────────────────────────────────────────────
 
-/// Applies search, category, ovrport, and type filters, then sorts the result.
+/// Applies search, genre, ovrport, type, and availability filters, then sorts.
 List<dynamic> filteredAndSorted(
   List<dynamic> apps, {
   required String searchQuery,
-  required String categoryFilter,
+  required String genreFilter,
   required bool ovrportFilter,
   required String typeFilter,
   required String sortOption,
+  bool availableOnly = false,
 }) {
   final query = searchQuery.toLowerCase();
 
   final filtered = apps.where((app) {
     final name = (app['name'] ?? app['title'] ?? '').toString().toLowerCase();
-    final category = (app['categories'] ?? app['category'] ?? '')
-        .toString()
-        .toLowerCase();
+    final genreRaw = _genreRaw(app).toLowerCase();
     final tags = (app['tags'] ?? '').toString().toLowerCase();
 
     final matchesSearch =
         name.contains(query) ||
-        category.contains(query) ||
+        genreRaw.contains(query) ||
         tags.contains(query);
 
-    final matchesCategory =
-        categoryFilter == 'All Categories' ||
-        category.contains(categoryFilter.toLowerCase());
+    final matchesGenre =
+        genreFilter == 'All Genres' ||
+        _parseGenres(genreRaw).any(
+          (g) => g == genreFilter.toLowerCase(),
+        );
 
     final matchesOvrport =
         !ovrportFilter ||
@@ -92,7 +102,11 @@ List<dynamic> filteredAndSorted(
     final appType = app['app_type']?.toString().toLowerCase() ?? 'app';
     final matchesType = typeFilter == 'all' || typeFilter == appType;
 
-    return matchesSearch && matchesCategory && matchesOvrport && matchesType;
+    final apkPath = app['apk_path']?.toString().trim();
+    final matchesAvailability =
+        !availableOnly || (apkPath != null && apkPath.isNotEmpty);
+
+    return matchesSearch && matchesGenre && matchesOvrport && matchesType && matchesAvailability;
   }).toList();
 
   filtered.sort((a, b) => _compare(a, b, sortOption));
