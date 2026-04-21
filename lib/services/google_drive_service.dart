@@ -78,6 +78,7 @@ class GoogleDriveService {
   Future<bool> startOAuthFlow(BuildContext context) async {
     final codeVerifier = _generateCodeVerifier();
     final authUrl = _buildAuthUrl(codeVerifier);
+    debugPrint('[GoogleDriveService] Opening OAuth URL: $authUrl');
 
     final code = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -86,6 +87,7 @@ class GoogleDriveService {
       ),
     );
 
+    debugPrint('[GoogleDriveService] OAuth returned code: ${code != null ? 'YES (length=${code.length})' : 'NULL'}');
     if (code == null) return false;
 
     await _exchangeCode(code, codeVerifier);

@@ -174,19 +174,45 @@ class InstallService {
         if (apkSize > 0) apkRemotePathToDownload = altApkPath;
       }
 
+      // Fallback: list the parent directory of the primary path and use
+      // directory-entry sizes (avoids the stat round-trip that may fail on
+      // some SMB servers with Smb2ErrorType.unknown).
+      if ((apkSize == 0 || apkRemotePathToDownload.isEmpty) &&
+          relativeApkPath.isNotEmpty) {
+        final lastSep = relativeApkPath.lastIndexOf('\\');
+        if (lastSep > 0) {
+          final parentDir = relativeApkPath.substring(0, lastSep);
+          try {
+            final List<Smb2DirEntry> entries = await pool.listDirectory(
+              parentDir,
+            );
+            for (final entry in entries) {
+              if (entry.name.endsWith('.apk') && entry.size > 0) {
+                apkSize = entry.size;
+                apkRemotePathToDownload = '$parentDir\\${entry.name}';
+                debugPrint(
+                  '[InstallService] Found APK via dir listing: $apkRemotePathToDownload ($apkSize bytes)',
+                );
+                break;
+              }
+            }
+          } catch (e) {
+            debugPrint(
+              '[InstallService] Error listing parent dir $parentDir: $e',
+            );
+          }
+        }
+      }
+
       if (apkSize == 0 || apkRemotePathToDownload.isEmpty) {
         final folder = 'downloads\\pico4\\apps\\$appId';
         try {
-          List<dynamic> files = await pool.listDirectory(folder);
-          for (var f in files) {
-            String name = f.name.toString();
-            if (name.endsWith('.apk')) {
-              final checkPath = '$folder\\$name';
-              apkSize = await getRemoteSize(checkPath);
-              if (apkSize > 0) {
-                apkRemotePathToDownload = checkPath;
-                break;
-              }
+          final List<Smb2DirEntry> files = await pool.listDirectory(folder);
+          for (final entry in files) {
+            if (entry.name.endsWith('.apk') && entry.size > 0) {
+              apkSize = entry.size;
+              apkRemotePathToDownload = '$folder\\${entry.name}';
+              break;
             }
           }
         } catch (e) {

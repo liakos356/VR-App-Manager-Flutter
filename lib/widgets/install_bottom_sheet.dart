@@ -17,7 +17,7 @@ void showInstallBottomSheet(
   required String installedPackageName,
   required VoidCallback onInstallDone,
 }) {
-  final apkPath = app['file_path_apk']?.toString() ?? '';
+  final apkPath = app['apk_path']?.toString() ?? '';
   if (apkPath.trim().isEmpty) return;
 
   showModalBottomSheet(
@@ -79,8 +79,8 @@ class _InstallSheetState extends State<_InstallSheet> {
     try {
       await InstallService.installAppLocally(
         appId: appId,
-        apkPath: widget.app['file_path_apk']?.toString() ?? '',
-        obbDir: widget.app['file_path_obb']?.toString() ?? '',
+        apkPath: widget.app['apk_path']?.toString() ?? '',
+        obbDir: widget.app['obb_dir']?.toString() ?? '',
         onProgress: (s) => setState(() => _status = s),
         onDownloadProgress: (p) {
           if (p >= 0.0 && p <= 1.0) setState(() => _progress = p);

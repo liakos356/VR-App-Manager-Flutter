@@ -124,8 +124,8 @@ class _AppDetailViewState extends State<AppDetailView>
     try {
       await InstallService.installAppLocally(
         appId: appId,
-        apkPath: widget.app['file_path_apk']?.toString() ?? '',
-        obbDir: widget.app['file_path_obb']?.toString() ?? '',
+        apkPath: widget.app['apk_path']?.toString() ?? '',
+        obbDir: widget.app['obb_dir']?.toString() ?? '',
         onProgress: (s) => setState(() => _installStatus = s),
         onDownloadProgress: (p) {
           if (p >= 0.0 && p <= 1.0) setState(() => _installProgress = p);
