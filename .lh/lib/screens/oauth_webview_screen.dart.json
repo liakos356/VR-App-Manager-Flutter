@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/screens/oauth_webview_screen.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776771293720,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776771293720,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/material.dart';\nimport 'package:webview_flutter/webview_flutter.dart';\n\n/// Full-screen WebView that drives the Google OAuth 2.0 PKCE flow.\n///\n/// Intercepts navigation to the custom-scheme redirect URI and extracts the\n/// authorisation code, returning it via [Navigator.pop].  Using a spoofed\n/// Chrome user-agent prevents Google from flagging the session as an\n/// embedded WebView and blocking the sign-in page.\nclass OAuthWebViewScreen extends StatefulWidget {\n  final String authUrl;\n\n  const OAuthWebViewScreen({super.key, required this.authUrl});\n\n  @override\n  State<OAuthWebViewScreen> createState() => _OAuthWebViewScreenState();\n}\n\nclass _OAuthWebViewScreenState extends State<OAuthWebViewScreen> {\n  late final WebViewController _controller;\n  bool _loading = true;\n\n  // The custom scheme Google redirects to after authorisation.\n  static const _callbackScheme =\n      'com.googleusercontent.apps.1012473018198-r4fbunv4mq4mo0fegafkmqeoorllqr1v';\n\n  @override\n  void initState() {\n    super.initState();\n    _controller = WebViewController()\n      ..setJavaScriptMode(JavaScriptMode.unrestricted)\n      // Spoof Chrome to avoid Google's embedded-WebView block.\n      ..setUserAgent(\n        'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 '\n        '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',\n      )\n      ..setNavigationDelegate(\n        NavigationDelegate(\n          onPageStarted: (_) {\n            if (mounted) setState(() => _loading = true);\n          },\n          onPageFinished: (_) {\n            if (mounted) setState(() => _loading = false);\n          },\n          onNavigationRequest: (NavigationRequest request) {\n            if (request.url.startsWith(_callbackScheme)) {\n              final uri = Uri.parse(request.url);\n              final code = uri.queryParameters['code'];\n              // Pop with the auth code (or null on error/cancel).\n              if (mounted) Navigator.of(context).pop(code);\n              return NavigationDecision.prevent;\n            }\n            return NavigationDecision.navigate;\n          },\n          onWebResourceError: (error) {\n            // Ignore errors for the callback scheme — expected on some\n            // platforms where the OS tries to resolve the custom URI.\n            debugPrint('[OAuthWebView] Resource error: ${error.description}');\n          },\n        ),\n      )\n      ..loadRequest(Uri.parse(widget.authUrl));\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return Scaffold(\n      appBar: AppBar(\n        title: const Text('Sign in with Google'),\n        leading: IconButton(\n          icon: const Icon(Icons.close),\n          tooltip: 'Cancel',\n          onPressed: () => Navigator.of(context).pop(null),\n        ),\n      ),\n      body: Stack(\n        children: [\n          WebViewWidget(controller: _controller),\n          if (_loading)\n            const Center(child: CircularProgressIndicator()),\n        ],\n      ),\n    );\n  }\n}\n"
+        }
+    ]
+}

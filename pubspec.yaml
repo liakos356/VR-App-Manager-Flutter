@@ -51,6 +51,8 @@ dependencies:
   chewie: ^1.13.1
   cached_network_image: ^3.4.1
   supabase_flutter: ^2.8.4
+  googleapis: ^13.2.0
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:

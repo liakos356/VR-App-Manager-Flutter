@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'services/google_drive_service.dart';
+
 // ── SMB configuration ─────────────────────────────────────────────────────
 // TODO: Move these to a build-time config or secure storage before releasing.
 const String _kSmbHost = '100.95.32.89';
@@ -23,6 +25,19 @@ class InstallService {
     Function(double)? onDownloadProgress,
     bool Function()? isCancelled,
   }) async {
+    // Route Google Drive installs to the dedicated method.
+    if (GoogleDriveService.isDrivePath(apkPath) ||
+        GoogleDriveService.isDrivePath(obbDir)) {
+      return _installFromDrive(
+        appId: appId,
+        apkPath: apkPath,
+        obbDir: obbDir,
+        onProgress: onProgress,
+        onDownloadProgress: onDownloadProgress,
+        isCancelled: isCancelled,
+      );
+    }
+
     // Request necessary permissions for Android 10+ devices
     if (Platform.isAndroid) {
       onProgress('Requesting permissions...');
@@ -297,6 +312,188 @@ class InstallService {
       throw Exception('Install Error: $e');
     } finally {
       await pool?.disconnect();
+    }
+  }
+
+  // ── Google Drive install path ─────────────────────────────────────────────
+
+  static Future<void> _installFromDrive({
+    required String appId,
+    required String apkPath,
+    required String obbDir,
+    required Function(String) onProgress,
+    Function(double)? onDownloadProgress,
+    bool Function()? isCancelled,
+  }) async {
+    if (Platform.isAndroid) {
+      onProgress('Requesting permissions...');
+      await Permission.requestInstallPackages.request();
+      if (!await Permission.manageExternalStorage.isGranted) {
+        onProgress('Please grant All Files Access in Settings if prompted...');
+        await Permission.manageExternalStorage.request();
+      }
+      if (!await Permission.storage.isGranted) {
+        await Permission.storage.request();
+      }
+    }
+
+    final driveService = GoogleDriveService();
+    if (!driveService.isSignedIn) {
+      throw Exception(
+        'Not signed in to Google Drive. Please sign in via Settings first.',
+      );
+    }
+
+    debugPrint('[InstallService] Starting Google Drive install for $appId...');
+    onProgress('Connecting to Google Drive...');
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    final apkFile = File('/sdcard/Download/$appId.apk');
+    int totalSizeToDownload = 0;
+    int totalDownloaded = 0;
+
+    Future<bool> downloadDriveFile(
+      String fileId,
+      File localFile,
+      int size,
+    ) async {
+      if (size == 0) return false;
+      onProgress('Downloading ${localFile.path.split('/').last}...');
+      int lastReceived = 0;
+      int speedTracker = totalDownloaded;
+      DateTime lastSpeedTime = DateTime.now();
+
+      try {
+        await driveService.downloadFile(
+          fileId: fileId,
+          localFile: localFile,
+          fileSize: size,
+          onProgress: (received, total) {
+            final delta = received - lastReceived;
+            lastReceived = received;
+            totalDownloaded += delta;
+
+            if (totalSizeToDownload > 0 && onDownloadProgress != null) {
+              onDownloadProgress(totalDownloaded / totalSizeToDownload);
+            }
+
+            final now = DateTime.now();
+            final elapsed = now.difference(lastSpeedTime).inMilliseconds;
+            if (elapsed >= 500) {
+              final speedBytes = totalDownloaded - speedTracker;
+              final speedMbps = (speedBytes / 1024 / 1024) / (elapsed / 1000);
+              onProgress('${speedMbps.toStringAsFixed(1)} MB/s');
+              speedTracker = totalDownloaded;
+              lastSpeedTime = now;
+            }
+          },
+          isCancelled: isCancelled,
+        );
+        final finalSize = await localFile.length();
+        debugPrint('[InstallService] Downloaded $finalSize bytes.');
+        return finalSize == size;
+      } catch (e) {
+        debugPrint('[InstallService] Drive download error: $e');
+        rethrow;
+      }
+    }
+
+    // 1. Resolve APK
+    onProgress('Locating APK on Google Drive...');
+    final apkFileId = await driveService.resolveFileId(apkPath);
+    if (apkFileId == null) {
+      throw Exception('APK not found on Google Drive: $apkPath');
+    }
+    final apkSize = await driveService.getFileSize(apkFileId);
+    if (apkSize == 0) {
+      throw Exception('APK has zero size on Google Drive: $apkPath');
+    }
+    debugPrint('[InstallService] Drive APK → $apkFileId ($apkSize bytes)');
+
+    // 2. Resolve OBBs
+    onProgress('Locating OBBs...');
+    String obbFolderName = appId;
+    final obbFilesToDownload = <Map<String, dynamic>>[];
+
+    if (GoogleDriveService.isDrivePath(obbDir)) {
+      final parts = obbDir
+          .replaceAll('\\', '/')
+          .split('/')
+          .where((p) => p.isNotEmpty)
+          .toList();
+      if (parts.isNotEmpty) obbFolderName = parts.last;
+
+      try {
+        final files = await driveService.listFiles(obbDir);
+        for (final f in files) {
+          final name = f.name ?? '';
+          if (name.endsWith('.obb') && f.id != null) {
+            final size = int.tryParse(f.size ?? '0') ?? 0;
+            if (size > 0) {
+              obbFilesToDownload.add({
+                'fileId': f.id,
+                'name': name,
+                'size': size,
+              });
+              debugPrint(
+                '[InstallService] Found Drive OBB: $name ($size bytes)',
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[InstallService] Error listing OBBs on Drive: $e');
+      }
+    }
+
+    // Total size
+    totalSizeToDownload = apkSize;
+    for (final obb in obbFilesToDownload) {
+      totalSizeToDownload += obb['size'] as int;
+    }
+
+    // 3. Download OBBs
+    if (obbFilesToDownload.isNotEmpty) {
+      final localObbDir = Directory('/sdcard/Android/obb/$obbFolderName');
+      if (!await localObbDir.exists()) {
+        try {
+          await localObbDir.create(recursive: true);
+        } catch (e) {
+          throw Exception('Permission denied for ${localObbDir.path}.');
+        }
+      }
+      for (final obb in obbFilesToDownload) {
+        final localFile = File('${localObbDir.path}/${obb['name'] as String}');
+        final success = await downloadDriveFile(
+          obb['fileId'] as String,
+          localFile,
+          obb['size'] as int,
+        );
+        if (!success) {
+          throw Exception('Failed to download OBB: ${obb['name']}');
+        }
+      }
+    }
+
+    // 4. Download APK
+    onProgress('Downloading APK...');
+    final apkSuccess = await downloadDriveFile(apkFileId, apkFile, apkSize);
+    if (!apkSuccess) {
+      throw Exception('Failed to download APK from Google Drive');
+    }
+
+    // 5. Trigger native install
+    debugPrint('[InstallService] All Drive files downloaded. Installing...');
+    onProgress('Triggering Native Install...');
+    final result = await platform.invokeMethod('installApk', {
+      'apkPath': apkFile.path,
+    });
+
+    if (result == true) {
+      debugPrint('[InstallService] Native install intent successful.');
+      onProgress('Installation Started!');
+    } else {
+      throw Exception('Installation Intent Failed.');
     }
   }
 }

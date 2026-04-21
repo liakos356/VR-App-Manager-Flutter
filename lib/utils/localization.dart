@@ -2,6 +2,61 @@ import 'package:flutter/material.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 final ValueNotifier<bool> isGreekNotifier = ValueNotifier(false);
+final ValueNotifier<int> accentIndexNotifier = ValueNotifier(0);
+
+class AccentColorOption {
+  final String name;
+  final Color lightColor;
+  final Color darkColor;
+  const AccentColorOption({
+    required this.name,
+    required this.lightColor,
+    required this.darkColor,
+  });
+}
+
+const List<AccentColorOption> accentColorOptions = [
+  AccentColorOption(
+    name: 'Purple',
+    lightColor: Colors.purple,
+    darkColor: Colors.purpleAccent,
+  ),
+  AccentColorOption(
+    name: 'Blue',
+    lightColor: Colors.blue,
+    darkColor: Colors.blueAccent,
+  ),
+  AccentColorOption(
+    name: 'Teal',
+    lightColor: Colors.teal,
+    darkColor: Colors.tealAccent,
+  ),
+  AccentColorOption(
+    name: 'Green',
+    lightColor: Colors.green,
+    darkColor: Colors.greenAccent,
+  ),
+  AccentColorOption(
+    name: 'Orange',
+    lightColor: Colors.deepOrange,
+    darkColor: Colors.orangeAccent,
+  ),
+  AccentColorOption(
+    name: 'Red',
+    lightColor: Colors.red,
+    darkColor: Colors.redAccent,
+  ),
+  AccentColorOption(
+    name: 'Pink',
+    lightColor: Colors.pink,
+    darkColor: Colors.pinkAccent,
+  ),
+  AccentColorOption(
+    name: 'Indigo',
+    lightColor: Colors.indigo,
+    darkColor: Colors.indigoAccent,
+  ),
+];
 
 String tr(String key) {
   if (!isGreekNotifier.value) return key;

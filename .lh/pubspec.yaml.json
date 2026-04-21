@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 2,
+            "activePatchIndex": 3,
             "patches": [
                 {
                     "date": 1776173036219,
@@ -16,6 +16,10 @@
                 {
                     "date": 1776763774310,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -45,8 +45,13 @@\n   auto_size_text: ^3.0.0\n   youtube_player_iframe: ^5.2.2\n   shared_preferences: ^2.5.5\n   permission_handler: ^12.0.1\n+  installed_apps: ^2.1.1\n+  video_player: ^2.11.1\n+  chewie: ^1.13.1\n+  cached_network_image: ^3.4.1\n+  supabase_flutter: ^2.8.4\n \n dev_dependencies:\n   flutter_test:\n     sdk: flutter\n"
+                },
+                {
+                    "date": 1776771293724,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -50,8 +50,10 @@\n   video_player: ^2.11.1\n   chewie: ^1.13.1\n   cached_network_image: ^3.4.1\n   supabase_flutter: ^2.8.4\n+  googleapis: ^13.2.0\n+  webview_flutter: ^4.10.0\n \n dev_dependencies:\n   flutter_test:\n     sdk: flutter\n"
                 }
             ],
             "date": 1776173036219,

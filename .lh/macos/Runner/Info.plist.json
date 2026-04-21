@@ -1,0 +1,18 @@
+{
+    "sourceFile": "macos/Runner/Info.plist",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776771293720,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776771293720,
+            "name": "Commit-0",
+            "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>CFBundleDevelopmentRegion</key>\n\t<string>$(DEVELOPMENT_LANGUAGE)</string>\n\t<key>CFBundleExecutable</key>\n\t<string>$(EXECUTABLE_NAME)</string>\n\t<key>CFBundleIconFile</key>\n\t<string></string>\n\t<key>CFBundleIdentifier</key>\n\t<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n\t<key>CFBundleInfoDictionaryVersion</key>\n\t<string>6.0</string>\n\t<key>CFBundleDisplayName</key>\n        <string>App Manager</string>\n        <key>CFBundleName</key>\n\t<string>$(PRODUCT_NAME)</string>\n\t<key>CFBundlePackageType</key>\n\t<string>APPL</string>\n\t<key>CFBundleShortVersionString</key>\n\t<string>$(FLUTTER_BUILD_NAME)</string>\n\t<key>CFBundleVersion</key>\n\t<string>$(FLUTTER_BUILD_NUMBER)</string>\n\t<key>LSMinimumSystemVersion</key>\n\t<string>$(MACOSX_DEPLOYMENT_TARGET)</string>\n\t<key>NSHumanReadableCopyright</key>\n\t<string>$(PRODUCT_COPYRIGHT)</string>\n\t<key>NSMainNibFile</key>\n\t<string>MainMenu</string>\n\t<key>NSPrincipalClass</key>\n\t<string>NSApplication</string>\n\t<key>GIDClientID</key>\n\t<string>1012473018198-r4fbunv4mq4mo0fegafkmqeoorllqr1v.apps.googleusercontent.com</string>\n\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>com.googleusercontent.apps.1012473018198-r4fbunv4mq4mo0fegafkmqeoorllqr1v</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n</dict>\n</plist>\n"
+        }
+    ]
+}

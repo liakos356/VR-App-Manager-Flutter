@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../db_service.dart';
+import '../services/google_drive_service.dart';
 import '../utils/app_filter.dart' as filter;
 import '../utils/localization.dart';
 import '../widgets/adjustable_split_view.dart';
@@ -461,196 +462,335 @@ class MainScreenState extends State<MainScreen> {
     return Drawer(
       width: 340,
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Text(
-                'Settings',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: Text(
+                  'Settings',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-            const Divider(),
-            // ── Language ──────────────────────────────────────────────────
-            ValueListenableBuilder<bool>(
-              valueListenable: isGreekNotifier,
-              builder: (context, isGreek, _) {
-                return ListTile(
-                  leading: const Icon(Icons.language),
-                  title: const Text('Language'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      isGreek ? 'GR' : 'EN',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+              const Divider(),
+              // ── Language ──────────────────────────────────────────────────
+              ValueListenableBuilder<bool>(
+                valueListenable: isGreekNotifier,
+                builder: (context, isGreek, _) {
+                  return ListTile(
+                    leading: const Icon(Icons.language),
+                    title: const Text('Language'),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                    ),
-                  ),
-                  onTap: () async {
-                    isGreekNotifier.value = !isGreekNotifier.value;
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setBool('isGreek', isGreekNotifier.value);
-                  },
-                );
-              },
-            ),
-            // ── Theme ─────────────────────────────────────────────────────
-            ValueListenableBuilder<ThemeMode>(
-              valueListenable: themeNotifier,
-              builder: (context, mode, _) {
-                final dark = mode == ThemeMode.dark;
-                return ListTile(
-                  leading: Icon(dark ? Icons.light_mode : Icons.dark_mode),
-                  title: const Text('Theme'),
-                  trailing: Text(
-                    dark ? 'Dark' : 'Light',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  onTap: () => themeNotifier.value = dark
-                      ? ThemeMode.light
-                      : ThemeMode.dark,
-                );
-              },
-            ),
-            // ── Ovrport Only ───────────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.vrpano_outlined),
-              title: const Text('Ovrport Only'),
-              subtitle: const Text('Show only Ovrport-compatible apps'),
-              trailing: Switch(
-                value: _ovrportFilter,
-                onChanged: (v) => setState(() {
-                  _ovrportFilter = v;
-                  _refilter();
-                  _savePreferences();
-                }),
-              ),
-            ),
-            // ── Available Only ─────────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.cloud_download_outlined),
-              title: const Text('Available Only'),
-              subtitle: const Text('Hide apps not on the server'),
-              trailing: Switch(
-                value: _availableOnly,
-                onChanged: (v) => setState(() {
-                  _availableOnly = v;
-                  _refilter();
-                  _savePreferences();
-                }),
-              ),
-            ),
-            // ── Updated Recently ───────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.new_releases_outlined),
-              title: const Text('Updated Recently'),
-              subtitle: const Text('Show only apps updated in the last 7 days'),
-              trailing: Switch(
-                value: _updatedRecentlyFilter,
-                onChanged: (v) => setState(() {
-                  _updatedRecentlyFilter = v;
-                  _refilter();
-                  _savePreferences();
-                }),
-              ),
-            ),
-            // ── Reload Database ────────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.sync),
-              title: const Text('Reload Database'),
-              onTap: () {
-                _scaffoldKey.currentState?.closeEndDrawer();
-                _fetchApps(forceRefresh: true);
-              },
-            ),
-            const Divider(),
-            // ── Card Size slider ───────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  Icon(Icons.grid_view_rounded),
-                  SizedBox(width: 12),
-                  Text('Card Size', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            ),
-            ValueListenableBuilder<double>(
-              valueListenable: _cardSizeNotifier,
-              builder: (context, cardSize, _) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.crop_square,
-                            size: 16,
-                            color: Theme.of(context).textTheme.bodySmall?.color
-                                ?.withValues(alpha: 0.7),
-                          ),
-                          Expanded(
-                            child: Slider(
-                              value: cardSize,
-                              min: 0.5,
-                              max: 2.0,
-                              divisions: 6,
-                              label: '${cardSize.toStringAsFixed(1)}×',
-                              onChanged: (v) => _cardSizeNotifier.value = v,
-                            ),
-                          ),
-                          Icon(
-                            Icons.crop_square,
-                            size: 28,
-                            color: Theme.of(context).textTheme.bodySmall?.color
-                                ?.withValues(alpha: 0.7),
-                          ),
-                        ],
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      Text(
-                        '${cardSize.toStringAsFixed(1)}× size',
+                      child: Text(
+                        isGreek ? 'GR' : 'EN',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
-                    ],
+                    ),
+                    onTap: () async {
+                      isGreekNotifier.value = !isGreekNotifier.value;
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('isGreek', isGreekNotifier.value);
+                    },
+                  );
+                },
+              ),
+              // ── Theme ─────────────────────────────────────────────────────
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: themeNotifier,
+                builder: (context, mode, _) {
+                  final dark = mode == ThemeMode.dark;
+                  return ListTile(
+                    leading: Icon(dark ? Icons.light_mode : Icons.dark_mode),
+                    title: const Text('Theme'),
+                    trailing: Text(
+                      dark ? 'Dark' : 'Light',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onTap: () => themeNotifier.value = dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark,
+                  );
+                },
+              ),
+              // ── Accent Color ───────────────────────────────────────────────
+              ValueListenableBuilder<int>(
+                valueListenable: accentIndexNotifier,
+                builder: (context, accentIdx, _) {
+                  final isDark =
+                      Theme.of(context).brightness == Brightness.dark;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.palette_outlined,
+                              color: Theme.of(context).iconTheme.color,
+                            ),
+                            const SizedBox(width: 16),
+                            const Text(
+                              'Accent Color',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: List.generate(accentColorOptions.length, (
+                            i,
+                          ) {
+                            final opt = accentColorOptions[i];
+                            final color = isDark
+                                ? opt.darkColor
+                                : opt.lightColor;
+                            final selected = i == accentIdx;
+                            return Tooltip(
+                              message: opt.name,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  accentIndexNotifier.value = i;
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  await prefs.setInt('accentColorIndex', i);
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: selected
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface
+                                          : Colors.transparent,
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
+                                              color: color.withValues(
+                                                alpha: 0.55,
+                                              ),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: selected
+                                      ? const Icon(
+                                          Icons.check,
+                                          size: 16,
+                                          color: Colors.white,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              // ── Ovrport Only ───────────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.vrpano_outlined),
+                title: const Text('Ovrport Only'),
+                subtitle: const Text('Show only Ovrport-compatible apps'),
+                trailing: Switch(
+                  value: _ovrportFilter,
+                  onChanged: (v) => setState(() {
+                    _ovrportFilter = v;
+                    _refilter();
+                    _savePreferences();
+                  }),
+                ),
+              ),
+              // ── Available Only ─────────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.cloud_download_outlined),
+                title: const Text('Available Only'),
+                subtitle: const Text('Hide apps not on the server'),
+                trailing: Switch(
+                  value: _availableOnly,
+                  onChanged: (v) => setState(() {
+                    _availableOnly = v;
+                    _refilter();
+                    _savePreferences();
+                  }),
+                ),
+              ),
+              // ── Updated Recently ───────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.new_releases_outlined),
+                title: const Text('Updated Recently'),
+                subtitle: const Text(
+                  'Show only apps updated in the last 7 days',
+                ),
+                trailing: Switch(
+                  value: _updatedRecentlyFilter,
+                  onChanged: (v) => setState(() {
+                    _updatedRecentlyFilter = v;
+                    _refilter();
+                    _savePreferences();
+                  }),
+                ),
+              ),
+              // ── Reload Database ────────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.sync),
+                title: const Text('Reload Database'),
+                onTap: () {
+                  _scaffoldKey.currentState?.closeEndDrawer();
+                  _fetchApps(forceRefresh: true);
+                },
+              ),
+              const Divider(),
+              // ── Card Size slider ───────────────────────────────────────────
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  children: [
+                    Icon(Icons.grid_view_rounded),
+                    SizedBox(width: 12),
+                    Text('Card Size', style: TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ),
+              ValueListenableBuilder<double>(
+                valueListenable: _cardSizeNotifier,
+                builder: (context, cardSize, _) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.crop_square,
+                              size: 16,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.color
+                                  ?.withValues(alpha: 0.7),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: cardSize,
+                                min: 0.5,
+                                max: 2.0,
+                                divisions: 6,
+                                label: '${cardSize.toStringAsFixed(1)}×',
+                                onChanged: (v) => _cardSizeNotifier.value = v,
+                              ),
+                            ),
+                            Icon(
+                              Icons.crop_square,
+                              size: 28,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.color
+                                  ?.withValues(alpha: 0.7),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${cardSize.toStringAsFixed(1)}× size',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).textTheme.bodySmall?.color
+                                ?.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              // ── Installed Apps ─────────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.install_mobile),
+                title: const Text('Installed Apps'),
+                onTap: () {
+                  _scaffoldKey.currentState?.closeEndDrawer();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const InstalledAppsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              // ── Google Drive Account ──────────────────────────────────────
+              ValueListenableBuilder<GoogleUserInfo?>(
+                valueListenable: GoogleDriveService().userNotifier,
+                builder: (ctx, user, _) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: user?.photoUrl != null
+                        ? NetworkImage(user!.photoUrl!)
+                        : null,
+                    child: user?.photoUrl == null
+                        ? const Icon(Icons.account_circle_outlined)
+                        : null,
                   ),
-                );
-              },
-            ),
-            const Divider(),
-            // ── Installed Apps ─────────────────────────────────────────────
-            ListTile(
-              leading: const Icon(Icons.install_mobile),
-              title: const Text('Installed Apps'),
-              onTap: () {
-                _scaffoldKey.currentState?.closeEndDrawer();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const InstalledAppsScreen(),
+                  title: const Text('Google Drive'),
+                  subtitle: Text(
+                    user?.email ?? 'Not connected — tap to sign in',
                   ),
-                );
-              },
-            ),
-          ],
+                  trailing: user != null
+                      ? TextButton(
+                          child: const Text('Sign out'),
+                          onPressed: () => GoogleDriveService().signOut(),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: user == null
+                      ? () async {
+                          try {
+                            await GoogleDriveService().startOAuthFlow(ctx);
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Google sign-in failed: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -673,7 +813,11 @@ class MainScreenState extends State<MainScreen> {
         separatorBuilder: (context, index) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           if (index == displayedApps.length) {
-            if (!_isLoadingMore) _loadMoreApps();
+            if (!_isLoadingMore) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _loadMoreApps(),
+              );
+            }
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator()),
