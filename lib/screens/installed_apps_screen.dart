@@ -501,8 +501,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                 )
               : PopupMenuButton<String>(
                   onSelected: (value) {
-                    if (value == 'launch')
+                    if (value == 'launch') {
                       InstalledApps.startApp(app.packageName);
+                    }
                     if (value == 'uninstall') _showUninstallDialog(app);
                     if (value == 'details') _showDetailsDialog(app);
                   },
@@ -604,8 +605,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                       icon: const Icon(Icons.more_vert, size: 20),
                       padding: EdgeInsets.zero,
                       onSelected: (value) {
-                        if (value == 'launch')
+                        if (value == 'launch') {
                           InstalledApps.startApp(app.packageName);
+                        }
                         if (value == 'uninstall') _showUninstallDialog(app);
                         if (value == 'details') _showDetailsDialog(app);
                       },

@@ -77,9 +77,8 @@ class AppCardState extends State<AppCard> {
 
   List<String> _computeImages() {
     final images = <String>[];
-    final hero =
-        (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
-            ?.toString();
+    final hero = (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
+        ?.toString();
     if (hero != null && hero.isNotEmpty) images.add(hero);
     if (widget.app['screenshots'] != null) {
       try {
@@ -89,7 +88,9 @@ class AppCardState extends State<AppCard> {
             decoded
                 .map((e) => e.toString())
                 .where((e) => e.isNotEmpty)
-                .take(2), // limit to 2 screenshots on grid card to reduce memory
+                .take(
+                  2,
+                ), // limit to 2 screenshots on grid card to reduce memory
           );
         }
       } catch (_) {}
@@ -124,11 +125,15 @@ class AppCardState extends State<AppCard> {
     // Legacy support: callers that pass isDetailView=true get AppDetailView.
     if (widget.isDetailView) {
       return AppDetailView(
-          app: widget.app, apiUrl: widget.apiUrl, showAsPage: false);
+        app: widget.app,
+        apiUrl: widget.apiUrl,
+        showAsPage: false,
+      );
     }
 
     final images = _cachedImages;
-    final isOvrport = widget.app['ovrport'] == 1 ||
+    final isOvrport =
+        widget.app['ovrport'] == 1 ||
         widget.app['ovrport'] == true ||
         widget.app['ovrport'] == '1' ||
         widget.app['ovrport'] == 'true';
@@ -136,16 +141,16 @@ class AppCardState extends State<AppCard> {
     final apkPath = widget.app['apk_path']?.toString().trim();
     final isUnavailable = apkPath == null || apkPath.isEmpty;
 
-    final _oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
-    final _createdAt = DateTime.tryParse(
-        widget.app['created_at']?.toString() ?? '');
-    final _updatedAt = DateTime.tryParse(
-        widget.app['updated_at']?.toString() ?? '');
-    final isNewApp =
-        _createdAt != null && _createdAt.isAfter(_oneWeekAgo);
-    final isUpdatedApp = !isNewApp &&
-        _updatedAt != null &&
-        _updatedAt.isAfter(_oneWeekAgo);
+    final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final createdAt = DateTime.tryParse(
+      widget.app['created_at']?.toString() ?? '',
+    );
+    final updatedAt = DateTime.tryParse(
+      widget.app['updated_at']?.toString() ?? '',
+    );
+    final isNewApp = createdAt != null && createdAt.isAfter(oneWeekAgo);
+    final isUpdatedApp =
+        !isNewApp && updatedAt != null && updatedAt.isAfter(oneWeekAgo);
 
     return RepaintBoundary(
       child: Opacity(
@@ -164,242 +169,272 @@ class AppCardState extends State<AppCard> {
             );
           },
           child: Card(
-          elevation: _isHovered ? 18 : 6,
-          clipBehavior: Clip.antiAlias,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
-          cursor: SystemMouseCursors.click,
-          child: InkWell(
-            onTap: () => _showDetails(context),
-            onLongPress: () => showInstallBottomSheet(
-              context,
-              app: widget.app,
-              isInstalled: _isInstalled,
-              installedPackageName: _installedPackageName,
-              onInstallDone: _refreshInstallState,
+            elevation: _isHovered ? 18 : 6,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
-            highlightColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-            hoverColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Image carousel ─────────────────────────────────────
-                Expanded(
-                  flex: 5,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      images.isNotEmpty
-                          ? _CardImageCarousel(
-                              images: images,
-                              currentIndex: _currentImageIndex,
-                              isHovered: _isHovered,
-                              hasMultiple: images.length > 1,
-                              onPrev: () => setState(() {
-                                _currentImageIndex =
-                                    (_currentImageIndex - 1 + images.length) %
-                                        images.length;
-                              }),
-                              onNext: () => setState(() {
-                                _currentImageIndex =
-                                    (_currentImageIndex + 1) % images.length;
-                              }),
-                            )
-                          : Container(
-                              color: Colors.grey[800],
-                              child: const Center(
-                                child: Icon(Icons.vrpano,
-                                    size: 64, color: Colors.white54),
-                              ),
-                            ),
-                      if (isOvrport)
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Ovrport',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isUnavailable)
-                        Positioned(
-                          top: 12,
-                          left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[800]!.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Unavailable',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isNewApp)
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'New',
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isUpdatedApp)
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.blueAccent.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Updated',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _isHovered = true),
+              onExit: (_) => setState(() => _isHovered = false),
+              cursor: SystemMouseCursors.click,
+              child: InkWell(
+                onTap: () => _showDetails(context),
+                onLongPress: () => showInstallBottomSheet(
+                  context,
+                  app: widget.app,
+                  isInstalled: _isInstalled,
+                  installedPackageName: _installedPackageName,
+                  onInstallDone: _refreshInstallState,
                 ),
-
-                // ── Info panel ─────────────────────────────────────────
-                Expanded(
-                  flex: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Flexible(
-                                child: AutoSizeText(
-                                  widget.app['name'] ??
-                                      widget.app['title'] ??
-                                      'Unknown App',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  minFontSize: 12,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (getAppSize(widget.app) > 0)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    'Size: ${formatBytes(getAppSize(widget.app))}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.color
-                                          ?.withValues(alpha: 0.7),
+                splashColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.18),
+                highlightColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
+                hoverColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.05),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Image carousel ─────────────────────────────────────
+                    Expanded(
+                      flex: 5,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          images.isNotEmpty
+                              ? _CardImageCarousel(
+                                  images: images,
+                                  currentIndex: _currentImageIndex,
+                                  isHovered: _isHovered,
+                                  hasMultiple: images.length > 1,
+                                  onPrev: () => setState(() {
+                                    _currentImageIndex =
+                                        (_currentImageIndex -
+                                            1 +
+                                            images.length) %
+                                        images.length;
+                                  }),
+                                  onNext: () => setState(() {
+                                    _currentImageIndex =
+                                        (_currentImageIndex + 1) %
+                                        images.length;
+                                  }),
+                                )
+                              : Container(
+                                  color: Colors.grey[800],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.vrpano,
+                                      size: 64,
+                                      color: Colors.white54,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
+                          if (isOvrport)
+                            Positioned(
+                              top: 12,
+                              right: 12,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(20),
+                                  horizontal: 6,
+                                  vertical: 2,
                                 ),
-                                child: AutoSizeText(
-                                  (widget.app['genres'] ??
-                                      widget.app['category'] ??
-                                      '') as String,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(
+                                    alpha: 0.9,
                                   ),
-                                  minFontSize: 10,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Ovrport',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            StarRating(
-                              rating: parseRating(
-                                widget.app['user_rating'] ??
-                                    widget.app['rating'],
+                          if (isUnavailable)
+                            Positioned(
+                              top: 12,
+                              left: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800]!.withValues(
+                                    alpha: 0.9,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Unavailable',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                              size: 18,
+                            ),
+                          if (isNewApp)
+                            Positioned(
+                              bottom: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'New',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (isUpdatedApp)
+                            Positioned(
+                              bottom: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withValues(
+                                    alpha: 0.92,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Updated',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Info panel ─────────────────────────────────────────
+                    Expanded(
+                      flex: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Flexible(
+                                    child: AutoSizeText(
+                                      widget.app['name'] ??
+                                          widget.app['title'] ??
+                                          'Unknown App',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      minFontSize: 12,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (getAppSize(widget.app) > 0)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        'Size: ${formatBytes(getAppSize(widget.app))}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.color
+                                              ?.withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: AutoSizeText(
+                                      (widget.app['genres'] ??
+                                              widget.app['category'] ??
+                                              '')
+                                          as String,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      minFontSize: 10,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                StarRating(
+                                  rating: parseRating(
+                                    widget.app['user_rating'] ??
+                                        widget.app['rating'],
+                                  ),
+                                  size: 18,
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-          ),
-        ),
-      ),      // TweenAnimationBuilder
-      ),      // Opacity
+        ), // TweenAnimationBuilder
+      ), // Opacity
     );
   }
 }
@@ -436,7 +471,8 @@ class _CardImageCarousel extends StatelessWidget {
           errorWidget: (context, url, error) => Container(
             color: Colors.grey[800],
             child: const Center(
-                child: Icon(Icons.vrpano, size: 64, color: Colors.white54)),
+              child: Icon(Icons.vrpano, size: 64, color: Colors.white54),
+            ),
           ),
         ),
         if (isHovered && hasMultiple) ...[

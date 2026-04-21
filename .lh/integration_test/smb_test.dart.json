@@ -1,0 +1,18 @@
+{
+    "sourceFile": "integration_test/smb_test.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776765549612,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776765549612,
+            "name": "Commit-0",
+            "content": "// ignore_for_file: avoid_print\nimport 'package:flutter_test/flutter_test.dart';\nimport 'package:integration_test/integration_test.dart';\nimport 'package:appmanager/db_service_io.dart';\n\nvoid main() {\n  IntegrationTestWidgetsFlutterBinding.ensureInitialized();\n\n  testWidgets('dump db', (tester) async {\n    final result = await fetchAppsFromDb(\"smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db\");\n    final apps = result.apps;\n    print(\"Found ${apps.length} apps\");\n    if (apps.isNotEmpty) {\n      print(\"Keys: ${apps.first.keys.toList()}\");\n      for (var k in apps.first.keys) {\n        print(\"$k: ${apps.first[k]}\");\n      }\n    }\n  });\n}\n"
+        }
+    ]
+}

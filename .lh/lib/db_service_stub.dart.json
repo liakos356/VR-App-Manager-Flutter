@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 1,
+            "activePatchIndex": 2,
             "patches": [
                 {
                     "date": 1776348577033,
@@ -12,6 +12,10 @@
                 {
                     "date": 1776763774307,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,9 +1,12 @@\n+import 'package:supabase_flutter/supabase_flutter.dart';\n+\n Future<List<Map<String, dynamic>>> fetchAppsFromDb(\n   String smbUrl, {\n   void Function(double)? onProgress,\n   bool forceRefresh = false,\n }) async {\n-  throw UnimplementedError(\n-    'SMB Database fetch is not supported on this platform.',\n-  );\n+  if (onProgress != null) onProgress(0.0);\n+  final response = await Supabase.instance.client.from('apps').select();\n+  if (onProgress != null) onProgress(1.0);\n+  return List<Map<String, dynamic>>.from(response);\n }\n"
+                },
+                {
+                    "date": 1776765549674,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,12 +1,24 @@\n import 'package:supabase_flutter/supabase_flutter.dart';\n \n-Future<List<Map<String, dynamic>>> fetchAppsFromDb(\n+const int kPageSize = 200;\n+\n+Future<({List<Map<String, dynamic>> apps, int totalCount})> fetchAppsFromDb(\n   String smbUrl, {\n   void Function(double)? onProgress,\n   bool forceRefresh = false,\n+  int page = 0,\n }) async {\n   if (onProgress != null) onProgress(0.0);\n-  final response = await Supabase.instance.client.from('apps').select();\n+  final from = page * kPageSize;\n+  final to = from + kPageSize - 1;\n+  final res = await Supabase.instance.client\n+      .from('apps')\n+      .select()\n+      .range(from, to)\n+      .count(CountOption.exact);\n   if (onProgress != null) onProgress(1.0);\n-  return List<Map<String, dynamic>>.from(response);\n+  return (\n+    apps: List<Map<String, dynamic>>.from(res.data as List),\n+    totalCount: res.count,\n+  );\n }\n"
                 }
             ],
             "date": 1776348577033,

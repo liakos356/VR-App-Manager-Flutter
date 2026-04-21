@@ -41,6 +41,12 @@ class MainScreenState extends State<MainScreen> {
   bool _isLoading = false;
   double _downloadProgress = -1.0;
 
+  // ── Pagination ────────────────────────────────────────────────────────────
+  int _totalCount = 0;
+  int _currentPage = 0;
+  bool _isLoadingMore = false;
+  bool get _hasMore => _apps.length < _totalCount;
+
   // ── Filter / sort state ───────────────────────────────────────────────────
 
   String _searchQuery = '';
@@ -175,15 +181,20 @@ class MainScreenState extends State<MainScreen> {
       _isLoading = true;
       _fetchError = null;
       _downloadProgress = -1.0;
+      _currentPage = 0;
+      _totalCount = 0;
     });
     try {
-      final smbApps = await fetchAppsFromDb(
+      final result = await fetchAppsFromDb(
         'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
         forceRefresh: forceRefresh,
         onProgress: (p) => setState(() => _downloadProgress = p),
+        page: 0,
       );
       setState(() {
-        _apps = smbApps;
+        _apps = result.apps;
+        _totalCount = result.totalCount;
+        _currentPage = 1;
         _refilter();
       });
     } catch (e) {
@@ -194,6 +205,27 @@ class MainScreenState extends State<MainScreen> {
         _isLoading = false;
         _downloadProgress = -1.0;
       });
+    }
+  }
+
+  Future<void> _loadMoreApps() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final result = await fetchAppsFromDb(
+        'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
+        page: _currentPage,
+      );
+      setState(() {
+        _apps = [..._apps, ...result.apps];
+        _totalCount = result.totalCount;
+        _currentPage++;
+        _refilter();
+      });
+    } catch (e) {
+      debugPrint('Error loading more apps: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -224,8 +256,9 @@ class MainScreenState extends State<MainScreen> {
     );
 
     // Compute genre metadata once here so build() just reads cached values.
-    _cachedAvailableGenresList =
-        filter.availableGenres(_cachedPreGenreFilteredApps);
+    _cachedAvailableGenresList = filter.availableGenres(
+      _cachedPreGenreFilteredApps,
+    );
     _cachedGenreCounts = filter.genreCountsMap(_cachedPreGenreFilteredApps);
 
     // If the selected genre is no longer present, reset to avoid empty list.
@@ -289,7 +322,11 @@ class MainScreenState extends State<MainScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: Text(
-                    '(${_showInstalledApps ? _installedAppsCount : displayedApps.length})',
+                    _showInstalledApps
+                        ? '($_installedAppsCount)'
+                        : _totalCount > 0
+                        ? '(${displayedApps.length} / $_totalCount)'
+                        : '(${displayedApps.length})',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -314,8 +351,9 @@ class MainScreenState extends State<MainScreen> {
                   onAppCountChanged: (count) {
                     if (_installedAppsCount != count) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted)
+                        if (mounted) {
                           setState(() => _installedAppsCount = count);
+                        }
                       });
                     }
                   },
@@ -398,6 +436,11 @@ class MainScreenState extends State<MainScreen> {
                                             apiUrl: _kApiUrl,
                                             constraints: constraints,
                                             cardSizeMultiplier: cardSize,
+                                            onLoadMore: _hasMore
+                                                ? _loadMoreApps
+                                                : null,
+                                            isLoadingMore: _isLoadingMore,
+                                            hasMore: _hasMore,
                                           );
                                         },
                                       );
@@ -626,9 +669,16 @@ class MainScreenState extends State<MainScreen> {
       left: ListView.separated(
         addAutomaticKeepAlives: false,
         padding: const EdgeInsets.all(16),
-        itemCount: displayedApps.length,
+        itemCount: displayedApps.length + (_hasMore ? 1 : 0),
         separatorBuilder: (context, index) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
+          if (index == displayedApps.length) {
+            if (!_isLoadingMore) _loadMoreApps();
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
           return AppListTile(
             app: displayedApps[index],
             isSelected: index == _selectedMasterDetailIndex,
@@ -680,12 +730,18 @@ class _AppGrid extends StatefulWidget {
   final String apiUrl;
   final BoxConstraints constraints;
   final double cardSizeMultiplier;
+  final VoidCallback? onLoadMore;
+  final bool isLoadingMore;
+  final bool hasMore;
 
   const _AppGrid({
     required this.apps,
     required this.apiUrl,
     required this.constraints,
     this.cardSizeMultiplier = 1.0,
+    this.onLoadMore,
+    this.isLoadingMore = false,
+    this.hasMore = false,
   });
 
   @override
@@ -695,6 +751,7 @@ class _AppGrid extends StatefulWidget {
 class _AppGridState extends State<_AppGrid> {
   final ScrollController _scrollController = ScrollController();
   bool _showFab = false;
+  bool _requestedMore = false;
 
   @override
   void initState() {
@@ -702,7 +759,27 @@ class _AppGridState extends State<_AppGrid> {
     _scrollController.addListener(() {
       final show = _scrollController.offset > 300;
       if (show != _showFab) setState(() => _showFab = show);
+
+      // Trigger load-more when within 500px of the bottom.
+      if (!_requestedMore &&
+          widget.hasMore &&
+          !widget.isLoadingMore &&
+          _scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 500) {
+        _requestedMore = true;
+        widget.onLoadMore?.call();
+      }
     });
+  }
+
+  @override
+  void didUpdateWidget(_AppGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset the guard once the previous load finishes so the next scroll
+    // to bottom triggers another fetch.
+    if (oldWidget.isLoadingMore && !widget.isLoadingMore) {
+      _requestedMore = false;
+    }
   }
 
   @override
@@ -724,23 +801,38 @@ class _AppGridState extends State<_AppGrid> {
 
     return Stack(
       children: [
-        GridView.builder(
-          addAutomaticKeepAlives: false,
-          addRepaintBoundaries: false, // AppCard already wraps itself in RepaintBoundary
+        CustomScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.75,
-            crossAxisSpacing: 24,
-            mainAxisSpacing: 24,
-          ),
-          itemCount: widget.apps.length,
-          itemBuilder: (_, index) => AppCard(
-            key: ValueKey(widget.apps[index]['id'] ?? index),
-            app: widget.apps[index],
-            apiUrl: widget.apiUrl,
-          ),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 24,
+                  mainAxisSpacing: 24,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: false,
+                  (_, index) => AppCard(
+                    key: ValueKey(widget.apps[index]['id'] ?? index),
+                    app: widget.apps[index],
+                    apiUrl: widget.apiUrl,
+                  ),
+                  childCount: widget.apps.length,
+                ),
+              ),
+            ),
+            if (widget.isLoadingMore)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+          ],
         ),
         Positioned(
           right: 24,
