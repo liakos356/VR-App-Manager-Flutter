@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 
+import '../utils/installed_apps_cache.dart';
+
 enum AppViewMode { list, grid }
 
 enum AppSortOption { name, packageName }
@@ -71,6 +73,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   Future<void> _uninstallApp(AppInfo app) async {
     try {
       await InstalledApps.uninstallApp(app.packageName);
+      InstalledAppsCache.invalidate();
       // Give the system a moment to process the uninstall, then refresh.
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) await _loadInstalledApps();

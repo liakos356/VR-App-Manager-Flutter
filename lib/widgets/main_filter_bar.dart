@@ -207,6 +207,14 @@ class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
                   value: 'Size (Small to Large)',
                   child: Text(tr('Size (Small to Large)')),
                 ),
+                DropdownMenuItem(
+                  value: 'Newest First',
+                  child: Text(tr('Newest First')),
+                ),
+                DropdownMenuItem(
+                  value: 'Oldest First',
+                  child: Text(tr('Oldest First')),
+                ),
               ],
               onChanged: onSortChanged,
             ),

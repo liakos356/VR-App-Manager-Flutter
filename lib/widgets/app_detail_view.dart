@@ -7,6 +7,7 @@ import 'package:installed_apps/installed_apps.dart';
 import '../install_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
+import '../utils/installed_apps_cache.dart';
 import '../utils/localization.dart';
 import 'app_detail_actions.dart';
 import 'app_detail_media.dart';
@@ -94,6 +95,7 @@ class _AppDetailViewState extends State<AppDetailView>
       if (_installedPackageName.isNotEmpty) {
         try {
           await InstalledApps.uninstallApp(_installedPackageName);
+          InstalledAppsCache.invalidate();
           await Future.delayed(const Duration(seconds: 1));
           _refreshInstallState();
         } catch (_) {}
@@ -129,6 +131,7 @@ class _AppDetailViewState extends State<AppDetailView>
           if (p >= 0.0 && p <= 1.0) setState(() => _installProgress = p);
         },
       );
+      InstalledAppsCache.invalidate();
       setState(() {
         _isInstalling = false;
         _installProgress = 1.0;

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'fullscreen_image_viewer.dart';
@@ -13,12 +14,13 @@ class AppDetailHeroImage extends StatelessWidget {
     if (url != null && url!.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Image.network(
-          url!,
+        child: CachedNetworkImage(
+          imageUrl: url!,
           width: double.infinity,
           height: height,
+          memCacheWidth: 1200,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _placeholder(),
+          errorWidget: (context, url, error) => _placeholder(),
         ),
       );
     }
@@ -64,28 +66,25 @@ class AppDetailScreenshotGrid extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              screenshots[index],
+            child: CachedNetworkImage(
+              imageUrl: screenshots[index],
               width: 200,
               height: 150,
+              memCacheWidth: 400,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
+              progressIndicatorBuilder: (context, url, progress) {
                 return Container(
                   width: 200,
                   height: 150,
                   color: placeholderColor,
                   child: Center(
                     child: CircularProgressIndicator(
-                      value: progress.expectedTotalBytes != null
-                          ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                          : null,
+                      value: progress.progress,
                     ),
                   ),
                 );
               },
-              errorBuilder: (context, error, stackTrace) => Container(
+              errorWidget: (context, url, error) => Container(
                 width: 200,
                 height: 150,
                 color: placeholderColor,

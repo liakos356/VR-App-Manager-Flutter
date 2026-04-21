@@ -62,6 +62,37 @@ List<String> availableAppTypes(List<dynamic> apps) {
   return types;
 }
 
+/// Computes a map of genre → count in a single O(n) pass.
+///
+/// Keys are lower-cased; `'all genres'` always maps to [apps.length].
+/// This replaces repeated [genreCount] calls (one per genre per build) with a
+/// single traversal that can be cached between builds.
+Map<String, int> genreCountsMap(List<dynamic> apps) {
+  final counts = <String, int>{'all genres': apps.length};
+  for (final app in apps) {
+    for (final g in _parseGenres(_genreRaw(app).toLowerCase())) {
+      if (g.isNotEmpty) {
+        counts[g] = (counts[g] ?? 0) + 1;
+      }
+    }
+  }
+  return counts;
+}
+
+/// Applies only the genre filter to an already-filtered and sorted list.
+///
+/// Because [apps] is already sorted by [filteredAndSorted], we can apply the
+/// genre sub-filter without re-sorting — replacing a second O(n log n) pass
+/// with an O(n) one.
+List<dynamic> applyGenreFilter(List<dynamic> apps, String genreFilter) {
+  if (genreFilter == 'All Genres') return apps;
+  final genreLower = genreFilter.toLowerCase();
+  return apps.where((app) {
+    final appGenres = _parseGenres(_genreRaw(app).toLowerCase());
+    return appGenres.any((g) => g == genreLower);
+  }).toList();
+}
+
 // ── Filter + sort ─────────────────────────────────────────────────────────────
 
 /// Applies search, genre, ovrport, type, and availability filters, then sorts.
@@ -73,6 +104,7 @@ List<dynamic> filteredAndSorted(
   required String typeFilter,
   required String sortOption,
   bool availableOnly = false,
+  bool updatedRecentlyFilter = false,
 }) {
   final query = searchQuery.toLowerCase();
 
@@ -106,7 +138,16 @@ List<dynamic> filteredAndSorted(
     final matchesAvailability =
         !availableOnly || (apkPath != null && apkPath.isNotEmpty);
 
-    return matchesSearch && matchesGenre && matchesOvrport && matchesType && matchesAvailability;
+    bool matchesUpdatedRecently = true;
+    if (updatedRecentlyFilter) {
+      final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+      final updatedAt =
+          DateTime.tryParse(app['updated_at']?.toString() ?? '');
+      matchesUpdatedRecently =
+          updatedAt != null && updatedAt.isAfter(oneWeekAgo);
+    }
+
+    return matchesSearch && matchesGenre && matchesOvrport && matchesType && matchesAvailability && matchesUpdatedRecently;
   }).toList();
 
   filtered.sort((a, b) => _compare(a, b, sortOption));
@@ -131,6 +172,20 @@ int _compare(dynamic a, dynamic b, String sortOption) {
       return getAppSize(b).compareTo(getAppSize(a));
     case 'Size (Small to Large)':
       return getAppSize(a).compareTo(getAppSize(b));
+    case 'Newest First':
+      final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
+      final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    case 'Oldest First':
+      final aDateO = DateTime.tryParse(a['created_at']?.toString() ?? '');
+      final bDateO = DateTime.tryParse(b['created_at']?.toString() ?? '');
+      if (aDateO == null && bDateO == null) return 0;
+      if (aDateO == null) return 1;
+      if (bDateO == null) return -1;
+      return aDateO.compareTo(bDateO);
     default:
       return 0;
   }

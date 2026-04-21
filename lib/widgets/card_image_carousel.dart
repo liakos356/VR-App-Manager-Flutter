@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Image strip with hover-activated prev/next navigation and dot indicators.
@@ -26,10 +27,11 @@ class CardImageCarousel extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.network(
-          images[currentIndex],
+        CachedNetworkImage(
+          imageUrl: images[currentIndex],
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
+          memCacheWidth: 600,
+          errorWidget: (context, url, error) => Container(
             color: Colors.grey[800],
             child: const Center(
               child: Icon(Icons.vrpano, size: 64, color: Colors.white54),

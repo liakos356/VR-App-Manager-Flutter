@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:installed_apps/installed_apps.dart';
 
 import '../install_service.dart';
+import '../utils/installed_apps_cache.dart';
 import '../utils/localization.dart';
 
 /// Opens a bottom sheet to install or uninstall [app].
@@ -85,6 +86,7 @@ class _InstallSheetState extends State<_InstallSheet> {
           if (p >= 0.0 && p <= 1.0) setState(() => _progress = p);
         },
       );
+      InstalledAppsCache.invalidate();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -111,6 +113,7 @@ class _InstallSheetState extends State<_InstallSheet> {
     if (widget.installedPackageName.isEmpty) return;
     try {
       await InstalledApps.uninstallApp(widget.installedPackageName);
+      InstalledAppsCache.invalidate();
       await Future.delayed(const Duration(seconds: 1));
       widget.onInstallDone();
       if (mounted) Navigator.pop(context);

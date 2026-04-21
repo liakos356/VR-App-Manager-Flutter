@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -32,6 +34,9 @@ class MainScreenState extends State<MainScreen> {
   List<dynamic> _apps = [];
   List<dynamic> _cachedFilteredApps = [];
   List<dynamic> _cachedPreGenreFilteredApps = [];
+  // Cached genre metadata – recomputed in _refilter(), read during builds.
+  List<String> _cachedAvailableGenresList = const ['All Genres'];
+  Map<String, int> _cachedGenreCounts = const {'all genres': 0};
   String? _fetchError;
   bool _isLoading = false;
   double _downloadProgress = -1.0;
@@ -43,6 +48,7 @@ class MainScreenState extends State<MainScreen> {
   String _genreFilter = 'All Genres';
   bool _ovrportFilter = false;
   bool _availableOnly = false;
+  bool _updatedRecentlyFilter = false;
   String _typeFilter = 'all';
 
   // ── View state ────────────────────────────────────────────────────────────
@@ -60,6 +66,12 @@ class MainScreenState extends State<MainScreen> {
 
   List<String> _searchHistory = [];
   final SearchController _searchController = SearchController();
+  Timer? _savePrefsDebounce;
+  Timer? _searchDebounce;
+
+  // Cached SharedPreferences instance — obtained once in initState so every
+  // subsequent read/write bypasses the async Dart-plugin bridge overhead.
+  SharedPreferences? _prefs;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -67,13 +79,22 @@ class MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _cardSizeNotifier = ValueNotifier<double>(1.0);
-    _loadPreferences();
-    _loadSearchHistory();
+    // Obtain SharedPreferences once; load prefs + history when ready.
+    SharedPreferences.getInstance().then((prefs) {
+      _prefs = prefs;
+      _loadPreferences(prefs);
+      _loadSearchHistory(prefs);
+    });
     _fetchApps();
     _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text;
-        _refilter();
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          setState(() {
+            _searchQuery = _searchController.text;
+            _refilter();
+          });
+        }
       });
     });
     _cardSizeNotifier.addListener(_savePreferences);
@@ -81,6 +102,8 @@ class MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _savePrefsDebounce?.cancel();
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _cardSizeNotifier.dispose();
     super.dispose();
@@ -88,13 +111,14 @@ class MainScreenState extends State<MainScreen> {
 
   // ── Preferences persistence ───────────────────────────────────────────────
 
-  Future<void> _loadPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _loadPreferences(SharedPreferences prefs) {
+    if (!mounted) return;
     setState(() {
       _sortOption = prefs.getString('sortOption') ?? 'Name (A-Z)';
       _genreFilter = prefs.getString('genreFilter') ?? 'All Genres';
       _ovrportFilter = prefs.getBool('ovrportFilter') ?? false;
       _availableOnly = prefs.getBool('availableOnly') ?? false;
+      _updatedRecentlyFilter = prefs.getBool('updatedRecentlyFilter') ?? false;
       _typeFilter = prefs.getString('typeFilter') ?? 'all';
       _viewMode = prefs.getString('viewMode') ?? 'grid';
       _genreSidebarOpen = prefs.getBool('genreSidebarOpen') ?? true;
@@ -104,40 +128,44 @@ class MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _savePreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sortOption', _sortOption);
-    await prefs.setString('genreFilter', _genreFilter);
-    await prefs.setBool('ovrportFilter', _ovrportFilter);
-    await prefs.setBool('availableOnly', _availableOnly);
-    await prefs.setString('typeFilter', _typeFilter);
-    await prefs.setString('viewMode', _viewMode);
-    await prefs.setBool('genreSidebarOpen', _genreSidebarOpen);
-    await prefs.setDouble('cardSize', _cardSizeNotifier.value);
+    _savePrefsDebounce?.cancel();
+    _savePrefsDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      await prefs.setString('sortOption', _sortOption);
+      await prefs.setString('genreFilter', _genreFilter);
+      await prefs.setBool('ovrportFilter', _ovrportFilter);
+      await prefs.setBool('availableOnly', _availableOnly);
+      await prefs.setBool('updatedRecentlyFilter', _updatedRecentlyFilter);
+      await prefs.setString('typeFilter', _typeFilter);
+      await prefs.setString('viewMode', _viewMode);
+      await prefs.setBool('genreSidebarOpen', _genreSidebarOpen);
+      await prefs.setDouble('cardSize', _cardSizeNotifier.value);
+    });
   }
 
   // ── Search history ────────────────────────────────────────────────────────
 
-  Future<void> _loadSearchHistory() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _loadSearchHistory(SharedPreferences prefs) {
+    if (!mounted) return;
     setState(() => _searchHistory = prefs.getStringList('searchHistory') ?? []);
   }
 
   Future<void> _saveSearchHistory(String query) async {
     if (query.trim().isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
     var history = prefs.getStringList('searchHistory') ?? [];
     history
       ..remove(query)
       ..insert(0, query);
     if (history.length > 4) history = history.sublist(0, 4);
     await prefs.setStringList('searchHistory', history);
-    setState(() => _searchHistory = history);
+    if (mounted) setState(() => _searchHistory = history);
   }
 
   Future<void> _clearSearchHistory() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
     await prefs.remove('searchHistory');
-    setState(() => _searchHistory = []);
+    if (mounted) setState(() => _searchHistory = []);
   }
 
   // ── App fetching ──────────────────────────────────────────────────────────
@@ -171,42 +199,46 @@ class MainScreenState extends State<MainScreen> {
 
   // ── Derived data (delegates to app_filter.dart) ───────────────────────────
 
-  List<String> get _availableGenres =>
-      filter.availableGenres(_cachedPreGenreFilteredApps);
+  /// Genre list for the side panel – read from cache, updated in [_refilter].
+  List<String> get _availableGenres => _cachedAvailableGenresList;
 
+  /// Per-genre count – read from the pre-computed map, no per-build traversal.
   int _getGenreCount(String genre) =>
-      filter.genreCount(_cachedPreGenreFilteredApps, genre);
+      _cachedGenreCounts[genre.toLowerCase()] ?? 0;
 
   /// Recomputes the filtered+sorted list into [_cachedFilteredApps].
   /// Also recomputes [_cachedPreGenreFilteredApps] which is used by the genre
   /// side panel to show only genres/counts relevant to the active filters.
   /// Call this inside every [setState] that changes a filter input or [_apps].
   void _refilter() {
+    // Single O(n log n) sort pass for the base (non-genre) filtered list.
     _cachedPreGenreFilteredApps = filter.filteredAndSorted(
       _apps,
       searchQuery: _searchQuery,
       genreFilter: 'All Genres',
       ovrportFilter: _ovrportFilter,
       availableOnly: _availableOnly,
+      updatedRecentlyFilter: _updatedRecentlyFilter,
       typeFilter: _typeFilter,
       sortOption: _sortOption,
     );
-    // If the currently selected genre is no longer present in the filtered
-    // results, reset it to "All Genres" so the panel stays consistent.
-    if (_genreFilter != 'All Genres') {
-      final availableNow = filter.availableGenres(_cachedPreGenreFilteredApps);
-      if (!availableNow.contains(_genreFilter)) {
-        _genreFilter = 'All Genres';
-      }
+
+    // Compute genre metadata once here so build() just reads cached values.
+    _cachedAvailableGenresList =
+        filter.availableGenres(_cachedPreGenreFilteredApps);
+    _cachedGenreCounts = filter.genreCountsMap(_cachedPreGenreFilteredApps);
+
+    // If the selected genre is no longer present, reset to avoid empty list.
+    if (_genreFilter != 'All Genres' &&
+        !_cachedAvailableGenresList.contains(_genreFilter)) {
+      _genreFilter = 'All Genres';
     }
-    _cachedFilteredApps = filter.filteredAndSorted(
-      _apps,
-      searchQuery: _searchQuery,
-      genreFilter: _genreFilter,
-      ovrportFilter: _ovrportFilter,
-      availableOnly: _availableOnly,
-      typeFilter: _typeFilter,
-      sortOption: _sortOption,
+
+    // Apply genre sub-filter on the already-sorted list — O(n) instead of
+    // a second O(n log n) pass through filteredAndSorted.
+    _cachedFilteredApps = filter.applyGenreFilter(
+      _cachedPreGenreFilteredApps,
+      _genreFilter,
     );
   }
 
@@ -477,6 +509,20 @@ class MainScreenState extends State<MainScreen> {
                 }),
               ),
             ),
+            // ── Updated Recently ───────────────────────────────────────────
+            ListTile(
+              leading: const Icon(Icons.new_releases_outlined),
+              title: const Text('Updated Recently'),
+              subtitle: const Text('Show only apps updated in the last 7 days'),
+              trailing: Switch(
+                value: _updatedRecentlyFilter,
+                onChanged: (v) => setState(() {
+                  _updatedRecentlyFilter = v;
+                  _refilter();
+                  _savePreferences();
+                }),
+              ),
+            ),
             // ── Reload Database ────────────────────────────────────────────
             ListTile(
               leading: const Icon(Icons.sync),
@@ -578,6 +624,7 @@ class MainScreenState extends State<MainScreen> {
 
     return AdjustableSplitView(
       left: ListView.separated(
+        addAutomaticKeepAlives: false,
         padding: const EdgeInsets.all(16),
         itemCount: displayedApps.length,
         separatorBuilder: (context, index) => const SizedBox(height: 8),
@@ -678,6 +725,8 @@ class _AppGridState extends State<_AppGrid> {
     return Stack(
       children: [
         GridView.builder(
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: false, // AppCard already wraps itself in RepaintBoundary
           controller: _scrollController,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

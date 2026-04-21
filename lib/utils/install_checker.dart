@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:installed_apps/installed_apps.dart';
+
+import 'installed_apps_cache.dart';
 
 /// Result of checking whether an app is currently installed on the device.
 typedef InstallCheckResult = ({bool isInstalled, String packageName});
@@ -10,12 +11,12 @@ typedef InstallCheckResult = ({bool isInstalled, String packageName});
 /// - Exact package-name match against `package_name` or `id` fields.
 /// - APK-path substring match.
 /// - Fuzzy title match (strips non-alpha chars then checks containment).
+///
+/// Uses [InstalledAppsCache] so all concurrent card-level checks share a
+/// single IPC call rather than each firing their own.
 Future<InstallCheckResult> checkAppInstalled(dynamic app) async {
   try {
-    final installedList = await InstalledApps.getInstalledApps(
-      excludeSystemApps: false,
-      excludeNonLaunchableApps: false,
-    );
+    final installedList = await InstalledAppsCache.get();
 
     final title = (app['title']?.toString() ?? '').toLowerCase();
     final apkPath = (app['file_path_apk']?.toString() ?? '').toLowerCase();

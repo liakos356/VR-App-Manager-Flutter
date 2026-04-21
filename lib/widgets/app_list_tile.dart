@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/localization.dart';
@@ -31,20 +32,22 @@ class AppListTile extends StatelessWidget {
 
     final Widget leadingImage;
     if (app['image'] != null) {
-      leadingImage = Image.network(
-        '$apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
+      leadingImage = CachedNetworkImage(
+        imageUrl: '$apiUrl/files/image?path=${Uri.encodeComponent(app['image'])}',
         width: 64,
         height: 64,
+        memCacheWidth: 128,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _placeholder(),
+        errorWidget: (_, _, _) => _placeholder(),
       );
     } else if (imgUrl != null) {
-      leadingImage = Image.network(
-        imgUrl,
+      leadingImage = CachedNetworkImage(
+        imageUrl: imgUrl,
         width: 64,
         height: 64,
+        memCacheWidth: 128,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _placeholder(),
+        errorWidget: (_, _, _) => _placeholder(),
       );
     } else {
       leadingImage = _placeholder();

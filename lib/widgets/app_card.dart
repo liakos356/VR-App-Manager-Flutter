@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/formatters.dart';
@@ -32,28 +33,36 @@ class AppCard extends StatefulWidget {
   State<AppCard> createState() => AppCardState();
 }
 
-class AppCardState extends State<AppCard> with WidgetsBindingObserver {
+class AppCardState extends State<AppCard> {
   bool _isHovered = false;
   int _currentImageIndex = 0;
   bool _isInstalled = false;
   String _installedPackageName = '';
+  late List<String> _cachedImages;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    _cachedImages = _computeImages();
     _refreshInstallState();
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+  void didUpdateWidget(AppCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app) {
+      _cachedImages = _computeImages();
+    }
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshInstallState();
+  void dispose() {
+    // Do NOT evict images from CachedNetworkImage's disk/memory cache here.
+    // Evicting on dispose defeats the purpose of caching: images would need
+    // to be re-downloaded every time a card re-enters the viewport while
+    // scrolling.  Flutter's painting cache (limited in main.dart to 100 images
+    // / 50 MB) handles LRU eviction automatically.
+    super.dispose();
   }
 
   Future<void> _refreshInstallState() async {
@@ -66,7 +75,7 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
     }
   }
 
-  List<String> get _allImages {
+  List<String> _computeImages() {
     final images = <String>[];
     final hero =
         (widget.app['thumbnail_url'] ?? widget.app['preview_photo'])
@@ -77,7 +86,10 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
         final decoded = jsonDecode(widget.app['screenshots'].toString());
         if (decoded is List) {
           images.addAll(
-            decoded.map((e) => e.toString()).where((e) => e.isNotEmpty),
+            decoded
+                .map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .take(2), // limit to 2 screenshots on grid card to reduce memory
           );
         }
       } catch (_) {}
@@ -115,7 +127,7 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
           app: widget.app, apiUrl: widget.apiUrl, showAsPage: false);
     }
 
-    final images = _allImages;
+    final images = _cachedImages;
     final isOvrport = widget.app['ovrport'] == 1 ||
         widget.app['ovrport'] == true ||
         widget.app['ovrport'] == '1' ||
@@ -123,6 +135,17 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
 
     final apkPath = widget.app['apk_path']?.toString().trim();
     final isUnavailable = apkPath == null || apkPath.isEmpty;
+
+    final _oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final _createdAt = DateTime.tryParse(
+        widget.app['created_at']?.toString() ?? '');
+    final _updatedAt = DateTime.tryParse(
+        widget.app['updated_at']?.toString() ?? '');
+    final isNewApp =
+        _createdAt != null && _createdAt.isAfter(_oneWeekAgo);
+    final isUpdatedApp = !isNewApp &&
+        _updatedAt != null &&
+        _updatedAt.isAfter(_oneWeekAgo);
 
     return RepaintBoundary(
       child: Opacity(
@@ -229,6 +252,48 @@ class AppCardState extends State<AppCard> with WidgetsBindingObserver {
                               'Unavailable',
                               style: TextStyle(
                                 color: Colors.white70,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (isNewApp)
+                        Positioned(
+                          bottom: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'New',
+                              style: TextStyle(
+                                color: Colors.black87,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (isUpdatedApp)
+                        Positioned(
+                          bottom: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withValues(alpha: 0.92),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Updated',
+                              style: TextStyle(
+                                color: Colors.white,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -364,10 +429,11 @@ class _CardImageCarousel extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.network(
-          images[currentIndex],
+        CachedNetworkImage(
+          imageUrl: images[currentIndex],
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Container(
+          memCacheWidth: 600,
+          errorWidget: (context, url, error) => Container(
             color: Colors.grey[800],
             child: const Center(
                 child: Icon(Icons.vrpano, size: 64, color: Colors.white54)),

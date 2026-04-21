@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 class FullscreenImageViewer extends StatefulWidget {
@@ -68,10 +69,10 @@ class FullscreenImageViewerState extends State<FullscreenImageViewer> {
               return InteractiveViewer(
                 minScale: 0.1,
                 maxScale: 4.0,
-                child: Image.network(
-                  widget.imageUrls[index],
+                child: CachedNetworkImage(
+                  imageUrl: widget.imageUrls[index],
                   fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => const Center(
+                  errorWidget: (_, _, _) => const Center(
                     child: Icon(
                       Icons.broken_image,
                       size: 100,
