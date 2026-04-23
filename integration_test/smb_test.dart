@@ -10,7 +10,7 @@ void main() {
     final result = await fetchAppsFromDb(
       "smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db",
     );
-    final apps = result.apps;
+    final apps = result;
     print("Found ${apps.length} apps");
     if (apps.isNotEmpty) {
       print("Keys: ${apps.first.keys.toList()}");

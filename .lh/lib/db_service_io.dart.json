@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 4,
+            "activePatchIndex": 5,
             "patches": [
                 {
                     "date": 1776173036515,
@@ -24,6 +24,10 @@
                 {
                     "date": 1776765549616,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,12 +1,24 @@\n import 'package:supabase_flutter/supabase_flutter.dart';\n \n-Future<List<Map<String, dynamic>>> fetchAppsFromDb(\n+const int kPageSize = 200;\n+\n+Future<({List<Map<String, dynamic>> apps, int totalCount})> fetchAppsFromDb(\n   String smbUrl, {\n   void Function(double)? onProgress,\n   bool forceRefresh = false,\n+  int page = 0,\n }) async {\n   if (onProgress != null) onProgress(0.0);\n-  final response = await Supabase.instance.client.from('apps').select();\n+  final from = page * kPageSize;\n+  final to = from + kPageSize - 1;\n+  final res = await Supabase.instance.client\n+      .from('apps')\n+      .select()\n+      .range(from, to)\n+      .count(CountOption.exact);\n   if (onProgress != null) onProgress(1.0);\n-  return List<Map<String, dynamic>>.from(response);\n+  return (\n+    apps: List<Map<String, dynamic>>.from(res.data as List),\n+    totalCount: res.count,\n+  );\n }\n"
+                },
+                {
+                    "date": 1776973723662,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,24 +1,34 @@\n import 'package:supabase_flutter/supabase_flutter.dart';\n \n-const int kPageSize = 200;\n-\n-Future<({List<Map<String, dynamic>> apps, int totalCount})> fetchAppsFromDb(\n+/// Fetches ALL apps from Supabase in batches of 1000 (the server-side max)\n+/// and returns them as a single flat list.\n+Future<List<Map<String, dynamic>>> fetchAppsFromDb(\n   String smbUrl, {\n   void Function(double)? onProgress,\n   bool forceRefresh = false,\n-  int page = 0,\n }) async {\n   if (onProgress != null) onProgress(0.0);\n-  final from = page * kPageSize;\n-  final to = from + kPageSize - 1;\n-  final res = await Supabase.instance.client\n-      .from('apps')\n-      .select()\n-      .range(from, to)\n-      .count(CountOption.exact);\n+  const int batchSize = 1000;\n+  final List<Map<String, dynamic>> all = [];\n+  int from = 0;\n+  int total = 0;\n+\n+  do {\n+    final to = from + batchSize - 1;\n+    final res = await Supabase.instance.client\n+        .from('apps')\n+        .select()\n+        .range(from, to)\n+        .count(CountOption.exact);\n+    final batch = List<Map<String, dynamic>>.from(res.data as List);\n+    all.addAll(batch);\n+    total = res.count;\n+    from += batchSize;\n+    if (onProgress != null && total > 0) {\n+      onProgress((all.length / total).clamp(0.0, 1.0));\n+    }\n+  } while (all.length < total);\n+\n   if (onProgress != null) onProgress(1.0);\n-  return (\n-    apps: List<Map<String, dynamic>>.from(res.data as List),\n-    totalCount: res.count,\n-  );\n+  return all;\n }\n"
                 }
             ],
             "date": 1776173036515,

@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776765549612,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776973723659,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,15 +1,17 @@\n // ignore_for_file: avoid_print\n+import 'package:appmanager/db_service_io.dart';\n import 'package:flutter_test/flutter_test.dart';\n import 'package:integration_test/integration_test.dart';\n-import 'package:appmanager/db_service_io.dart';\n \n void main() {\n   IntegrationTestWidgetsFlutterBinding.ensureInitialized();\n \n   testWidgets('dump db', (tester) async {\n-    final result = await fetchAppsFromDb(\"smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db\");\n-    final apps = result.apps;\n+    final result = await fetchAppsFromDb(\n+      \"smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db\",\n+    );\n+    final apps = result;\n     print(\"Found ${apps.length} apps\");\n     if (apps.isNotEmpty) {\n       print(\"Keys: ${apps.first.keys.toList()}\");\n       for (var k in apps.first.keys) {\n"
                 }
             ],
             "date": 1776765549612,

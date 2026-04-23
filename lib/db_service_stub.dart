@@ -1,24 +1,32 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const int kPageSize = 200;
-
-Future<({List<Map<String, dynamic>> apps, int totalCount})> fetchAppsFromDb(
+Future<List<Map<String, dynamic>>> fetchAppsFromDb(
   String smbUrl, {
   void Function(double)? onProgress,
   bool forceRefresh = false,
-  int page = 0,
 }) async {
   if (onProgress != null) onProgress(0.0);
-  final from = page * kPageSize;
-  final to = from + kPageSize - 1;
-  final res = await Supabase.instance.client
-      .from('apps')
-      .select()
-      .range(from, to)
-      .count(CountOption.exact);
+  const int batchSize = 1000;
+  final List<Map<String, dynamic>> all = [];
+  int from = 0;
+  int total = 0;
+
+  do {
+    final to = from + batchSize - 1;
+    final res = await Supabase.instance.client
+        .from('apps')
+        .select()
+        .range(from, to)
+        .count(CountOption.exact);
+    final batch = List<Map<String, dynamic>>.from(res.data as List);
+    all.addAll(batch);
+    total = res.count;
+    from += batchSize;
+    if (onProgress != null && total > 0) {
+      onProgress((all.length / total).clamp(0.0, 1.0));
+    }
+  } while (all.length < total);
+
   if (onProgress != null) onProgress(1.0);
-  return (
-    apps: List<Map<String, dynamic>>.from(res.data as List),
-    totalCount: res.count,
-  );
+  return all;
 }

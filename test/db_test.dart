@@ -7,6 +7,6 @@ void main() {
     final result = await fetchAppsFromDb(
       'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
     );
-    print('APP COLUMNS_MAGIC_MARKER: ${result.apps.first.keys}');
+    print('APP COLUMNS_MAGIC_MARKER: ${result.first.keys}');
   });
 }

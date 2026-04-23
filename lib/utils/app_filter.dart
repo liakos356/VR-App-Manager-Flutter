@@ -135,6 +135,14 @@ List<dynamic> filteredAndSorted(
         genreRaw.contains(query) ||
         tags.contains(query);
 
+    // When favorites mode is active, show ALL favorited apps regardless of
+    // any other active filter (availability, ovrport, type, genre, etc.).
+    // Only the search query is still respected.
+    if (favoritesOnly) {
+      return matchesSearch &&
+          favoriteIds.contains((app['id'] ?? '').toString());
+    }
+
     final matchesGenre =
         genreFilter == 'All Genres' ||
         _parseGenres(genreRaw).any((g) => g == genreFilter.toLowerCase());
@@ -162,16 +170,12 @@ List<dynamic> filteredAndSorted(
       matchesUpdatedRecently = updatedAt != null && updatedAt.isAfter(cutoff);
     }
 
-    final matchesFavorites =
-        !favoritesOnly || favoriteIds.contains((app['id'] ?? '').toString());
-
     return matchesSearch &&
         matchesGenre &&
         matchesOvrport &&
         matchesType &&
         matchesAvailability &&
-        matchesUpdatedRecently &&
-        matchesFavorites;
+        matchesUpdatedRecently;
   }).toList();
 
   filtered.sort((a, b) => _compare(a, b, sortOption));

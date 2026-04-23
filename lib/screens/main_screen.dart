@@ -47,12 +47,6 @@ class MainScreenState extends State<MainScreen> {
   bool _isLoading = false;
   double _downloadProgress = -1.0;
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  int _totalCount = 0;
-  int _currentPage = 0;
-  bool _isLoadingMore = false;
-  bool get _hasMore => _apps.length < _totalCount;
-
   // ── Filter / sort state ───────────────────────────────────────────────────
 
   String _searchQuery = '';
@@ -218,22 +212,17 @@ class MainScreenState extends State<MainScreen> {
       if (!silent) _isLoading = true;
       _fetchError = null;
       if (!silent) _downloadProgress = -1.0;
-      _currentPage = 0;
-      _totalCount = 0;
     });
     try {
-      final result = await fetchAppsFromDb(
+      final apps = await fetchAppsFromDb(
         'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
         forceRefresh: forceRefresh,
         onProgress: silent
             ? null
             : (p) => setState(() => _downloadProgress = p),
-        page: 0,
       );
       setState(() {
-        _apps = result.apps;
-        _totalCount = result.totalCount;
-        _currentPage = 1;
+        _apps = apps;
         _refilter();
       });
     } catch (e) {
@@ -244,27 +233,6 @@ class MainScreenState extends State<MainScreen> {
         if (!silent) _isLoading = false;
         if (!silent) _downloadProgress = -1.0;
       });
-    }
-  }
-
-  Future<void> _loadMoreApps() async {
-    if (_isLoadingMore || !_hasMore) return;
-    setState(() => _isLoadingMore = true);
-    try {
-      final result = await fetchAppsFromDb(
-        'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
-        page: _currentPage,
-      );
-      setState(() {
-        _apps = [..._apps, ...result.apps];
-        _totalCount = result.totalCount;
-        _currentPage++;
-        _refilter();
-      });
-    } catch (e) {
-      debugPrint('Error loading more apps: $e');
-    } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -282,21 +250,6 @@ class MainScreenState extends State<MainScreen> {
   /// side panel to show only genres/counts relevant to the active filters.
   /// Call this inside every [setState] that changes a filter input or [_apps].
   void _refilter() {
-    if (_favoritesOnly) {
-      final favIds = StoreFavoritesNotifier.instance.value;
-      debugPrint(
-        '[Favorites] _refilter: favoritesOnly=$_favoritesOnly, '
-        'favoriteIds=$favIds, appsLoaded=${_apps.length}',
-      );
-      if (_apps.isNotEmpty) {
-        final sample = _apps.first;
-        debugPrint(
-          '[Favorites] Sample app id=${sample['id']} '
-          '(${sample['id'].runtimeType}), '
-          'idStr=${sample['id']?.toString()}',
-        );
-      }
-    }
     // Single O(n log n) sort pass for the base (non-genre) filtered list.
     _cachedPreGenreFilteredApps = filter.filteredAndSorted(
       _apps,
@@ -316,7 +269,7 @@ class MainScreenState extends State<MainScreen> {
     // reflect totals regardless of active filters.
     _cachedAvailableGenresList = filter.availableGenres(_apps);
     _cachedGenreCounts = Map.of(filter.genreCountsMap(_apps))
-      ..['all genres'] = _totalCount > 0 ? _totalCount : _apps.length;
+      ..['all genres'] = _apps.length;
 
     // If the selected genre is no longer present, reset to avoid empty list.
     if (_genreFilter != 'All Genres' &&
@@ -379,9 +332,7 @@ class MainScreenState extends State<MainScreen> {
                   child: Text(
                     _showInstalledApps
                         ? '($_installedAppsCount)'
-                        : _totalCount > 0
-                        ? '(${displayedApps.length} / $_totalCount)'
-                        : '(${displayedApps.length})',
+                        : '(${displayedApps.length} / ${_apps.length})',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -513,11 +464,6 @@ class MainScreenState extends State<MainScreen> {
                                                   cardSizeMultiplier: cardSize,
                                                   cardSizeNotifier:
                                                       _cardSizeNotifier,
-                                                  onLoadMore: _hasMore
-                                                      ? _loadMoreApps
-                                                      : null,
-                                                  isLoadingMore: _isLoadingMore,
-                                                  hasMore: _hasMore,
                                                   onRefresh: () => _fetchApps(
                                                     forceRefresh: true,
                                                     silent: true,
@@ -635,20 +581,9 @@ class MainScreenState extends State<MainScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           addAutomaticKeepAlives: false,
           padding: const EdgeInsets.all(16),
-          itemCount: displayedApps.length + (_hasMore ? 1 : 0),
+          itemCount: displayedApps.length,
           separatorBuilder: (context, index) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
-            if (index == displayedApps.length) {
-              if (!_isLoadingMore) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => _loadMoreApps(),
-                );
-              }
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
             return AppListTile(
               app: displayedApps[index],
               isSelected: index == _selectedMasterDetailIndex,
@@ -727,9 +662,6 @@ class _AppGrid extends StatefulWidget {
   final BoxConstraints constraints;
   final double cardSizeMultiplier;
   final ValueNotifier<double> cardSizeNotifier;
-  final VoidCallback? onLoadMore;
-  final bool isLoadingMore;
-  final bool hasMore;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onSwitchToMasterDetail;
 
@@ -740,9 +672,6 @@ class _AppGrid extends StatefulWidget {
     required this.constraints,
     required this.cardSizeNotifier,
     this.cardSizeMultiplier = 1.0,
-    this.onLoadMore,
-    this.isLoadingMore = false,
-    this.hasMore = false,
     this.onRefresh,
     this.onSwitchToMasterDetail,
   });
@@ -754,7 +683,6 @@ class _AppGrid extends StatefulWidget {
 class _AppGridState extends State<_AppGrid> {
   final ScrollController _scrollController = ScrollController();
   bool _showFab = false;
-  bool _requestedMore = false;
   bool _sliderVisible = true;
   Timer? _scrollStopTimer;
 
@@ -765,16 +693,6 @@ class _AppGridState extends State<_AppGrid> {
       final show = _scrollController.offset > 300;
       if (show != _showFab) setState(() => _showFab = show);
 
-      // Trigger load-more when within 500px of the bottom.
-      if (!_requestedMore &&
-          widget.hasMore &&
-          !widget.isLoadingMore &&
-          _scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 500) {
-        _requestedMore = true;
-        widget.onLoadMore?.call();
-      }
-
       // Hide slider while scrolling; reappear after scrolling stops.
       if (_sliderVisible) setState(() => _sliderVisible = false);
       _scrollStopTimer?.cancel();
@@ -782,16 +700,6 @@ class _AppGridState extends State<_AppGrid> {
         if (mounted) setState(() => _sliderVisible = true);
       });
     });
-  }
-
-  @override
-  void didUpdateWidget(_AppGrid oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Reset the guard once the previous load finishes so the next scroll
-    // to bottom triggers another fetch.
-    if (oldWidget.isLoadingMore && !widget.isLoadingMore) {
-      _requestedMore = false;
-    }
   }
 
   @override
@@ -878,13 +786,6 @@ class _AppGridState extends State<_AppGrid> {
                   ),
                 ),
               ),
-              if (widget.isLoadingMore)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
             ],
           ),
         ),

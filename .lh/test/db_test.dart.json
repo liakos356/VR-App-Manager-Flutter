@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776765549612,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776973723660,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,4 +1,12 @@\n // ignore_for_file: avoid_print\n+import 'package:appmanager/db_service.dart';\n import 'package:flutter_test/flutter_test.dart';\n-import 'package:appmanager/db_service.dart';\n-void main() { test('check db schema', () async { final result = await fetchAppsFromDb('smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db'); print('APP COLUMNS_MAGIC_MARKER: ${result.apps.first.keys}'); }); }\n+\n+void main() {\n+  test('check db schema', () async {\n+    final result = await fetchAppsFromDb(\n+      'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',\n+    );\n+    print('APP COLUMNS_MAGIC_MARKER: ${result.first.keys}');\n+  });\n+}\n"
                 }
             ],
             "date": 1776765549612,
