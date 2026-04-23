@@ -1,0 +1,41 @@
+#!/bin/bash
+# pre-push hook — runs build_and_copy.sh when pushing to master.
+# Stored in .githooks/ (tracked). Activate once per clone with:
+#   git config core.hooksPath .githooks
+
+REMOTE="$1"
+# URL="$2"  # available if needed
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+PUSH_TO_MASTER=0
+
+# stdin contains lines: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [[ "$remote_ref" == "refs/heads/master" || "$remote_ref" == "refs/heads/main" ]]; then
+        PUSH_TO_MASTER=1
+        break
+    fi
+done
+
+if [[ $PUSH_TO_MASTER -eq 0 ]]; then
+    exit 0
+fi
+
+echo ""
+echo "==> Push to master detected. Running build_and_copy.sh..."
+echo ""
+
+# Redirect stdin from the terminal so the script's interactive prompts work.
+bash "$REPO_ROOT/scripts/build_and_copy.sh" < /dev/tty
+EXIT_CODE=$?
+
+if [[ $EXIT_CODE -ne 0 ]]; then
+    echo ""
+    echo "==> build_and_copy.sh failed (exit $EXIT_CODE). Push aborted."
+    exit 1
+fi
+
+echo ""
+echo "==> Build and deploy succeeded. Proceeding with push."
+exit 0

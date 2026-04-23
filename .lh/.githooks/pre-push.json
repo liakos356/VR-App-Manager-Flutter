@@ -1,0 +1,18 @@
+{
+    "sourceFile": ".githooks/pre-push",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776939192766,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776939192766,
+            "name": "Commit-0",
+            "content": "#!/bin/bash\n# pre-push hook — runs build_and_copy.sh when pushing to master.\n# Stored in .githooks/ (tracked). Activate once per clone with:\n#   git config core.hooksPath .githooks\n\nREMOTE=\"$1\"\n# URL=\"$2\"  # available if needed\n\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n\nPUSH_TO_MASTER=0\n\n# stdin contains lines: <local_ref> <local_sha> <remote_ref> <remote_sha>\nwhile read -r local_ref local_sha remote_ref remote_sha; do\n    if [[ \"$remote_ref\" == \"refs/heads/master\" || \"$remote_ref\" == \"refs/heads/main\" ]]; then\n        PUSH_TO_MASTER=1\n        break\n    fi\ndone\n\nif [[ $PUSH_TO_MASTER -eq 0 ]]; then\n    exit 0\nfi\n\necho \"\"\necho \"==> Push to master detected. Running build_and_copy.sh...\"\necho \"\"\n\n# Redirect stdin from the terminal so the script's interactive prompts work.\nbash \"$REPO_ROOT/scripts/build_and_copy.sh\" < /dev/tty\nEXIT_CODE=$?\n\nif [[ $EXIT_CODE -ne 0 ]]; then\n    echo \"\"\n    echo \"==> build_and_copy.sh failed (exit $EXIT_CODE). Push aborted.\"\n    exit 1\nfi\n\necho \"\"\necho \"==> Build and deploy succeeded. Proceeding with push.\"\nexit 0\n"
+        }
+    ]
+}
