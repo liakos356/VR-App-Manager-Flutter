@@ -39,6 +39,7 @@ class _AppDetailViewState extends State<AppDetailView>
   bool _isInstalled = false;
   String _installedPackageName = '';
   bool _isInstalling = false;
+  bool _isCancelled = false;
   double _installProgress = 0.0;
   String _installStatus = 'Starting...';
 
@@ -117,6 +118,7 @@ class _AppDetailViewState extends State<AppDetailView>
 
     setState(() {
       _isInstalling = true;
+      _isCancelled = false;
       _installProgress = 0.0;
       _installStatus = 'Starting...';
     });
@@ -130,6 +132,7 @@ class _AppDetailViewState extends State<AppDetailView>
         onDownloadProgress: (p) {
           if (p >= 0.0 && p <= 1.0) setState(() => _installProgress = p);
         },
+        isCancelled: () => _isCancelled,
       );
       InstalledAppsCache.invalidate();
       setState(() {
@@ -146,7 +149,7 @@ class _AppDetailViewState extends State<AppDetailView>
       }
     } catch (e) {
       setState(() => _isInstalling = false);
-      if (mounted) {
+      if (mounted && !_isCancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
@@ -309,7 +312,11 @@ class _AppDetailViewState extends State<AppDetailView>
                           isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
                           installProgress: _installProgress,
                           installStatus: _installStatus,
-                          onTap: _isInstalling || (widget.app['apk_path']?.toString().trim().isEmpty ?? true) ? null : _handleInstallTap,
+                          onTap: (widget.app['apk_path']?.toString().trim().isEmpty ?? true)
+                              ? null
+                              : (_isInstalling
+                                  ? () => setState(() => _isCancelled = true)
+                                  : _handleInstallTap),
                         ),
                         if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
                           const SizedBox(height: 12),
@@ -408,7 +415,11 @@ class _AppDetailViewState extends State<AppDetailView>
                         isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
                         installProgress: _installProgress,
                         installStatus: _installStatus,
-                        onTap: _isInstalling || (widget.app['apk_path']?.toString().trim().isEmpty ?? true) ? null : _handleInstallTap,
+                        onTap: (widget.app['apk_path']?.toString().trim().isEmpty ?? true)
+                            ? null
+                            : (_isInstalling
+                                ? () => setState(() => _isCancelled = true)
+                                : _handleInstallTap),
                         compact: true,
                       ),
                     ),

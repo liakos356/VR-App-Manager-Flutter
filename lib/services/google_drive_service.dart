@@ -352,6 +352,22 @@ class GoogleDriveService {
     return result.files ?? const [];
   }
 
+  /// Searches all of Drive for a file with exactly [name].
+  /// Returns the first match (with id and size), or null if not found.
+  Future<drive.File?> findFileByName(String name) async {
+    final api = await _api();
+    final escaped = name.replaceAll("'", r"\'");
+    final result = await api.files.list(
+      q: "name='$escaped' and trashed=false and mimeType!='application/vnd.google-apps.folder'",
+      spaces: 'drive',
+      $fields: 'files(id,name,size)',
+      pageSize: 1,
+    );
+    final files = result.files;
+    if (files == null || files.isEmpty) return null;
+    return files.first;
+  }
+
   /// Downloads a Drive file to [localFile] with progress callbacks.
   Future<void> downloadFile({
     required String fileId,

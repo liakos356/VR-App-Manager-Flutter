@@ -93,6 +93,20 @@ List<dynamic> applyGenreFilter(List<dynamic> apps, String genreFilter) {
   }).toList();
 }
 
+// ── Fuzzy search ──────────────────────────────────────────────────────────────
+
+/// Returns true if every character in [query] appears in [text] in the same
+/// order (subsequence match).  Both arguments are expected to be lower-cased
+/// by the caller.  An empty query always matches.
+bool _fuzzyMatch(String text, String query) {
+  if (query.isEmpty) return true;
+  int qi = 0;
+  for (int i = 0; i < text.length && qi < query.length; i++) {
+    if (text[i] == query[qi]) qi++;
+  }
+  return qi == query.length;
+}
+
 // ── Filter + sort ─────────────────────────────────────────────────────────────
 
 /// Applies search, genre, ovrport, type, and availability filters, then sorts.
@@ -114,7 +128,7 @@ List<dynamic> filteredAndSorted(
     final tags = (app['tags'] ?? '').toString().toLowerCase();
 
     final matchesSearch =
-        name.contains(query) ||
+        _fuzzyMatch(name, query) ||
         genreRaw.contains(query) ||
         tags.contains(query);
 

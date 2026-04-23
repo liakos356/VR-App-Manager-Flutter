@@ -26,6 +26,10 @@ class AppSearchField extends StatelessWidget {
       isFullScreen: false,
       searchController: controller,
       viewConstraints: const BoxConstraints(maxHeight: 300),
+      viewOnSubmitted: (value) {
+        onSaveHistory(value);
+        controller.closeView(value);
+      },
       builder: (BuildContext context, SearchController ctl) {
         return Material(
           elevation: 2,

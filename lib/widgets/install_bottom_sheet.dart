@@ -55,6 +55,7 @@ class _InstallSheet extends StatefulWidget {
 
 class _InstallSheetState extends State<_InstallSheet> {
   bool _installing = false;
+  bool _cancelled = false;
   double _progress = 0.0;
   String _status = 'Starting...';
 
@@ -73,6 +74,7 @@ class _InstallSheetState extends State<_InstallSheet> {
     }
     setState(() {
       _installing = true;
+      _cancelled = false;
       _progress = 0.0;
       _status = 'Starting...';
     });
@@ -85,6 +87,7 @@ class _InstallSheetState extends State<_InstallSheet> {
         onDownloadProgress: (p) {
           if (p >= 0.0 && p <= 1.0) setState(() => _progress = p);
         },
+        isCancelled: () => _cancelled,
       );
       InstalledAppsCache.invalidate();
       if (mounted) {
@@ -96,7 +99,7 @@ class _InstallSheetState extends State<_InstallSheet> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && !_cancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Installation Failed: $e'),
@@ -146,10 +149,17 @@ class _InstallSheetState extends State<_InstallSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
+              if (_installing)
+              IconButton(
+                onPressed: () => setState(() => _cancelled = true),
+                icon: const Icon(Icons.stop_circle_outlined),
+                iconSize: 48,
+                color: Colors.red.shade400,
+                tooltip: tr('Cancel'),
+              )
+            else
               OutlinedButton(
-                onPressed: _installing
-                    ? null
-                    : () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(context).pop(),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,

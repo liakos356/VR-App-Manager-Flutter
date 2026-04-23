@@ -177,11 +177,14 @@ class MainScreenState extends State<MainScreen> {
 
   // ── App fetching ──────────────────────────────────────────────────────────
 
-  Future<void> _fetchApps({bool forceRefresh = false}) async {
+  Future<void> _fetchApps({
+    bool forceRefresh = false,
+    bool silent = false,
+  }) async {
     setState(() {
-      _isLoading = true;
+      if (!silent) _isLoading = true;
       _fetchError = null;
-      _downloadProgress = -1.0;
+      if (!silent) _downloadProgress = -1.0;
       _currentPage = 0;
       _totalCount = 0;
     });
@@ -189,7 +192,7 @@ class MainScreenState extends State<MainScreen> {
       final result = await fetchAppsFromDb(
         'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
         forceRefresh: forceRefresh,
-        onProgress: (p) => setState(() => _downloadProgress = p),
+        onProgress: silent ? null : (p) => setState(() => _downloadProgress = p),
         page: 0,
       );
       setState(() {
@@ -200,11 +203,11 @@ class MainScreenState extends State<MainScreen> {
       });
     } catch (e) {
       debugPrint('Error fetching apps from DB: $e');
-      setState(() => _fetchError = e.toString());
+      if (!silent) setState(() => _fetchError = e.toString());
     } finally {
       setState(() {
-        _isLoading = false;
-        _downloadProgress = -1.0;
+        if (!silent) _isLoading = false;
+        if (!silent) _downloadProgress = -1.0;
       });
     }
   }
@@ -442,6 +445,10 @@ class MainScreenState extends State<MainScreen> {
                                                 : null,
                                             isLoadingMore: _isLoadingMore,
                                             hasMore: _hasMore,
+                                            onRefresh: () => _fetchApps(
+                                              forceRefresh: true,
+                                              silent: true,
+                                            ),
                                           );
                                         },
                                       );
@@ -806,30 +813,35 @@ class MainScreenState extends State<MainScreen> {
     final selectedApp = displayedApps[_selectedMasterDetailIndex];
 
     return AdjustableSplitView(
-      left: ListView.separated(
-        addAutomaticKeepAlives: false,
-        padding: const EdgeInsets.all(16),
-        itemCount: displayedApps.length + (_hasMore ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          if (index == displayedApps.length) {
-            if (!_isLoadingMore) {
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _loadMoreApps(),
+      left: RefreshIndicator(
+        onRefresh: () => _fetchApps(forceRefresh: true, silent: true),
+        displacement: 60,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          addAutomaticKeepAlives: false,
+          padding: const EdgeInsets.all(16),
+          itemCount: displayedApps.length + (_hasMore ? 1 : 0),
+          separatorBuilder: (context, index) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            if (index == displayedApps.length) {
+              if (!_isLoadingMore) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _loadMoreApps(),
+                );
+              }
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
               );
             }
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
+            return AppListTile(
+              app: displayedApps[index],
+              isSelected: index == _selectedMasterDetailIndex,
+              apiUrl: _kApiUrl,
+              onTap: () => setState(() => _selectedMasterDetailIndex = index),
             );
-          }
-          return AppListTile(
-            app: displayedApps[index],
-            isSelected: index == _selectedMasterDetailIndex,
-            apiUrl: _kApiUrl,
-            onTap: () => setState(() => _selectedMasterDetailIndex = index),
-          );
-        },
+          },
+        ),
       ),
       right: AppDetailPanel(app: selectedApp, apiUrl: _kApiUrl),
     );
@@ -877,6 +889,7 @@ class _AppGrid extends StatefulWidget {
   final VoidCallback? onLoadMore;
   final bool isLoadingMore;
   final bool hasMore;
+  final Future<void> Function()? onRefresh;
 
   const _AppGrid({
     required this.apps,
@@ -886,6 +899,7 @@ class _AppGrid extends StatefulWidget {
     this.onLoadMore,
     this.isLoadingMore = false,
     this.hasMore = false,
+    this.onRefresh,
   });
 
   @override
@@ -945,38 +959,46 @@ class _AppGridState extends State<_AppGrid> {
 
     return Stack(
       children: [
-        CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 24,
-                  mainAxisSpacing: 24,
+        RefreshIndicator(
+          onRefresh: widget.onRefresh ?? () async {},
+          displacement: 60,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            controller: _scrollController,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: false,
-                  (_, index) => AppCard(
-                    key: ValueKey(widget.apps[index]['id'] ?? index),
-                    app: widget.apps[index],
-                    apiUrl: widget.apiUrl,
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: 0.75,
+                    crossAxisSpacing: 24,
+                    mainAxisSpacing: 24,
                   ),
-                  childCount: widget.apps.length,
+                  delegate: SliverChildBuilderDelegate(
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: false,
+                    (_, index) => AppCard(
+                      key: ValueKey(widget.apps[index]['id'] ?? index),
+                      app: widget.apps[index],
+                      apiUrl: widget.apiUrl,
+                    ),
+                    childCount: widget.apps.length,
+                  ),
                 ),
               ),
-            ),
-            if (widget.isLoadingMore)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
+              if (widget.isLoadingMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         Positioned(
           right: 24,

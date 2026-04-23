@@ -6,6 +6,7 @@ import 'trailer_dialog.dart';
 import 'video_dialog.dart';
 
 /// Large install / uninstall button with an animated progress bar overlay.
+/// While a download is in progress, tapping the button cancels it.
 class AppDetailInstallButton extends StatelessWidget {
   final bool isInstalled;
   final bool isInstalling;
@@ -50,6 +51,10 @@ class AppDetailInstallButton extends StatelessWidget {
               : installStatus)
         : (isInstalled ? tr('Uninstall') : tr('Install'));
 
+    final IconData icon = isInstalling
+        ? Icons.stop_rounded
+        : (isInstalled ? Icons.delete_outline : Icons.download);
+
     final double btnHeight = compact ? 48 : 64;
     final double hPad = compact ? 20 : 36;
     final double vPad = compact ? 12 : 18;
@@ -92,11 +97,7 @@ class AppDetailInstallButton extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isInstalling ? Icons.downloading : Icons.download,
-                      size: iconSize,
-                      color: contentColor,
-                    ),
+                    Icon(icon, size: iconSize, color: contentColor),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
