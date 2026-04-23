@@ -410,6 +410,32 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                 ),
                               ),
                             ),
+                          // ── Installed badge ─────────────────────────────
+                          if (_isInstalled)
+                            Positioned(
+                              bottom: 8,
+                              right: 38,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade600.withValues(
+                                    alpha: 0.92,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Installed',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
                           // ── Favorite star ───────────────────────────────
                           Positioned(
                             bottom: 6,

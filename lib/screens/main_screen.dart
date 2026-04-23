@@ -282,6 +282,21 @@ class MainScreenState extends State<MainScreen> {
   /// side panel to show only genres/counts relevant to the active filters.
   /// Call this inside every [setState] that changes a filter input or [_apps].
   void _refilter() {
+    if (_favoritesOnly) {
+      final favIds = StoreFavoritesNotifier.instance.value;
+      debugPrint(
+        '[Favorites] _refilter: favoritesOnly=$_favoritesOnly, '
+        'favoriteIds=$favIds, appsLoaded=${_apps.length}',
+      );
+      if (_apps.isNotEmpty) {
+        final sample = _apps.first;
+        debugPrint(
+          '[Favorites] Sample app id=${sample['id']} '
+          '(${sample['id'].runtimeType}), '
+          'idStr=${sample['id']?.toString()}',
+        );
+      }
+    }
     // Single O(n log n) sort pass for the base (non-genre) filtered list.
     _cachedPreGenreFilteredApps = filter.filteredAndSorted(
       _apps,
@@ -375,9 +390,7 @@ class MainScreenState extends State<MainScreen> {
                 ),
               ),
               IconButton(
-                icon: Icon(
-                  _settingsPanelOpen ? Icons.tune : Icons.tune,
-                ),
+                icon: Icon(_settingsPanelOpen ? Icons.tune : Icons.tune),
                 onPressed: () => setState(() {
                   _settingsPanelOpen = !_settingsPanelOpen;
                   _savePreferences();
@@ -485,10 +498,7 @@ class MainScreenState extends State<MainScreen> {
                                           valueListenable: _cardSizeNotifier,
                                           builder: (context, cardSize, _) {
                                             return LayoutBuilder(
-                                              builder: (
-                                                context,
-                                                constraints,
-                                              ) {
+                                              builder: (context, constraints) {
                                                 if (_viewMode ==
                                                     'master_detail') {
                                                   return _buildMasterDetailView(
@@ -517,7 +527,8 @@ class MainScreenState extends State<MainScreen> {
                                                         _viewMode =
                                                             'master_detail';
                                                         _cardSizeNotifier
-                                                            .value = 1.0;
+                                                                .value =
+                                                            1.0;
                                                         _savePreferences();
                                                       }),
                                                 );
@@ -664,8 +675,7 @@ class MainScreenState extends State<MainScreen> {
       const double itemHeight = 80.0;
       const double separatorHeight = 8.0;
       const double topPadding = 16.0;
-      final double offset =
-          topPadding + index * (itemHeight + separatorHeight);
+      final double offset = topPadding + index * (itemHeight + separatorHeight);
       _masterDetailScrollController.jumpTo(
         offset.clamp(
           _masterDetailScrollController.position.minScrollExtent,
@@ -795,9 +805,14 @@ class _AppGridState extends State<_AppGrid> {
   void jumpToIndex(int index) {
     if (!_scrollController.hasClients) return;
     final w = widget.constraints.maxWidth;
-    final int baseCount = w > 1200 ? 5 : w > 800 ? 4 : 2;
-    final int crossAxisCount =
-        (baseCount / widget.cardSizeMultiplier).round().clamp(1, 10);
+    final int baseCount = w > 1200
+        ? 5
+        : w > 800
+        ? 4
+        : 2;
+    final int crossAxisCount = (baseCount / widget.cardSizeMultiplier)
+        .round()
+        .clamp(1, 10);
 
     const double hPad = 24.0;
     const double spacing = 24.0;
@@ -894,10 +909,9 @@ class _AppGridState extends State<_AppGrid> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(ctx)
-                            .colorScheme
-                            .surface
-                            .withValues(alpha: 0.88),
+                        color: Theme.of(
+                          ctx,
+                        ).colorScheme.surface.withValues(alpha: 0.88),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: const [
                           BoxShadow(
@@ -907,10 +921,9 @@ class _AppGridState extends State<_AppGrid> {
                           ),
                         ],
                         border: Border.all(
-                          color: Theme.of(ctx)
-                              .colorScheme
-                              .outline
-                              .withValues(alpha: 0.2),
+                          color: Theme.of(
+                            ctx,
+                          ).colorScheme.outline.withValues(alpha: 0.2),
                         ),
                       ),
                       child: SliderTheme(
@@ -922,24 +935,20 @@ class _AppGridState extends State<_AppGrid> {
                           overlayShape: const RoundSliderOverlayShape(
                             overlayRadius: 12,
                           ),
-                          activeTrackColor: Theme.of(ctx)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.7),
-                          inactiveTrackColor: Theme.of(ctx)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.18),
-                          thumbColor:
-                              Theme.of(ctx).colorScheme.primary,
+                          activeTrackColor: Theme.of(
+                            ctx,
+                          ).colorScheme.primary.withValues(alpha: 0.7),
+                          inactiveTrackColor: Theme.of(
+                            ctx,
+                          ).colorScheme.onSurface.withValues(alpha: 0.18),
+                          thumbColor: Theme.of(ctx).colorScheme.primary,
                         ),
                         child: Slider(
                           value: cardSize,
                           min: 0.5,
                           max: 2.0,
                           divisions: 6,
-                          onChanged: (v) =>
-                              widget.cardSizeNotifier.value = v,
+                          onChanged: (v) => widget.cardSizeNotifier.value = v,
                           onChangeEnd: (v) {
                             if (v <= 0.5) {
                               widget.onSwitchToMasterDetail?.call();

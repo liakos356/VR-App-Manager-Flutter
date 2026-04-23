@@ -57,11 +57,13 @@ class AppDetailScreenshotGrid extends StatelessWidget {
       alignment: WrapAlignment.center,
       children: List.generate(screenshots.length, (index) {
         return GestureDetector(
-          onTap: () => showDialog(
-            context: context,
-            builder: (context) => FullscreenImageViewer(
-              imageUrls: screenshots,
-              initialIndex: index,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              fullscreenDialog: true,
+              builder: (_) => FullscreenImageViewer(
+                imageUrls: screenshots,
+                initialIndex: index,
+              ),
             ),
           ),
           child: ClipRRect(
@@ -78,9 +80,7 @@ class AppDetailScreenshotGrid extends StatelessWidget {
                   height: 150,
                   color: placeholderColor,
                   child: Center(
-                    child: CircularProgressIndicator(
-                      value: progress.progress,
-                    ),
+                    child: CircularProgressIndicator(value: progress.progress),
                   ),
                 );
               },

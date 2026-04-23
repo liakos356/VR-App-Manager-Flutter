@@ -323,36 +323,52 @@ class _AppDetailViewState extends State<AppDetailView>
                       ),
                     ),
                     const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        AppDetailInstallButton(
-                          isInstalled: _isInstalled,
-                          isInstalling: _isInstalling,
-                          isAvailable:
-                              (widget.app['apk_path']
-                                  ?.toString()
-                                  .trim()
-                                  .isNotEmpty ??
-                              false),
-                          installProgress: _installProgress,
-                          installStatus: _installStatus,
-                          onTap:
-                              (widget.app['apk_path']
-                                      ?.toString()
-                                      .trim()
-                                      .isEmpty ??
-                                  true)
-                              ? null
-                              : (_isInstalling
-                                    ? () => setState(() => _isCancelled = true)
-                                    : _handleInstallTap),
-                        ),
-                        if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          AppDetailTrailerButton(videoUrl: _videoUrl!),
+                    IntrinsicWidth(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppDetailInstallButton(
+                            isInstalled: _isInstalled,
+                            isInstalling: _isInstalling,
+                            isAvailable:
+                                (widget.app['apk_path']
+                                    ?.toString()
+                                    .trim()
+                                    .isNotEmpty ??
+                                false),
+                            installProgress: _installProgress,
+                            installStatus: _installStatus,
+                            onTap:
+                                (widget.app['apk_path']
+                                        ?.toString()
+                                        .trim()
+                                        .isEmpty ??
+                                    true)
+                                ? null
+                                : (_isInstalling
+                                      ? () =>
+                                            setState(() => _isCancelled = true)
+                                      : _handleInstallTap),
+                            compact: true,
+                          ),
+                          if (_isInstalled &&
+                              _installedPackageName.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            AppDetailLaunchButton(
+                              packageName: _installedPackageName,
+                              compact: true,
+                            ),
+                          ],
+                          if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            AppDetailTrailerButton(
+                              videoUrl: _videoUrl!,
+                              compact: true,
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -437,61 +453,142 @@ class _AppDetailViewState extends State<AppDetailView>
                 ],
                 const SizedBox(height: 12),
 
-                // Action buttons — side by side
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppDetailInstallButton(
-                        isInstalled: _isInstalled,
-                        isInstalling: _isInstalling,
-                        isAvailable:
-                            (widget.app['apk_path']
-                                ?.toString()
-                                .trim()
-                                .isNotEmpty ??
-                            false),
-                        installProgress: _installProgress,
-                        installStatus: _installStatus,
-                        onTap:
-                            (widget.app['apk_path']
-                                    ?.toString()
-                                    .trim()
-                                    .isEmpty ??
-                                true)
-                            ? null
-                            : (_isInstalling
-                                  ? () => setState(() => _isCancelled = true)
-                                  : _handleInstallTap),
-                        compact: true,
-                      ),
-                    ),
-                    if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
-                      const SizedBox(width: 8),
+                // Action buttons
+                if (_videoUrl != null && _videoUrl!.isNotEmpty)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left column: Watch Trailer
                       Expanded(
                         child: AppDetailTrailerButton(
                           videoUrl: _videoUrl!,
                           compact: true,
                         ),
                       ),
-                    ],
-                    if (appId.isNotEmpty) ...[
                       const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: isFav
-                            ? 'Remove from favorites'
-                            : 'Add to favorites',
-                        icon: Icon(
-                          isFav
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          color: isFav ? Colors.amber : null,
+                      // Right column: Install/Uninstall + Launch
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppDetailInstallButton(
+                                    isInstalled: _isInstalled,
+                                    isInstalling: _isInstalling,
+                                    isAvailable:
+                                        (widget.app['apk_path']
+                                            ?.toString()
+                                            .trim()
+                                            .isNotEmpty ??
+                                        false),
+                                    installProgress: _installProgress,
+                                    installStatus: _installStatus,
+                                    onTap:
+                                        (widget.app['apk_path']
+                                                ?.toString()
+                                                .trim()
+                                                .isEmpty ??
+                                            true)
+                                        ? null
+                                        : (_isInstalling
+                                              ? () => setState(
+                                                  () => _isCancelled = true,
+                                                )
+                                              : _handleInstallTap),
+                                    compact: true,
+                                  ),
+                                ),
+                                if (appId.isNotEmpty)
+                                  IconButton(
+                                    tooltip: isFav
+                                        ? 'Remove from favorites'
+                                        : 'Add to favorites',
+                                    icon: Icon(
+                                      isFav
+                                          ? Icons.star_rounded
+                                          : Icons.star_border_rounded,
+                                      color: isFav ? Colors.amber : null,
+                                    ),
+                                    onPressed: () => StoreFavoritesNotifier
+                                        .instance
+                                        .toggle(appId),
+                                  ),
+                              ],
+                            ),
+                            if (_isInstalled &&
+                                _installedPackageName.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              AppDetailLaunchButton(
+                                packageName: _installedPackageName,
+                                compact: true,
+                              ),
+                            ],
+                          ],
                         ),
-                        onPressed: () =>
-                            StoreFavoritesNotifier.instance.toggle(appId),
                       ),
                     ],
-                  ],
-                ),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppDetailInstallButton(
+                              isInstalled: _isInstalled,
+                              isInstalling: _isInstalling,
+                              isAvailable:
+                                  (widget.app['apk_path']
+                                      ?.toString()
+                                      .trim()
+                                      .isNotEmpty ??
+                                  false),
+                              installProgress: _installProgress,
+                              installStatus: _installStatus,
+                              onTap:
+                                  (widget.app['apk_path']
+                                          ?.toString()
+                                          .trim()
+                                          .isEmpty ??
+                                      true)
+                                  ? null
+                                  : (_isInstalling
+                                        ? () => setState(
+                                            () => _isCancelled = true,
+                                          )
+                                        : _handleInstallTap),
+                              compact: true,
+                            ),
+                          ),
+                          if (appId.isNotEmpty)
+                            IconButton(
+                              tooltip: isFav
+                                  ? 'Remove from favorites'
+                                  : 'Add to favorites',
+                              icon: Icon(
+                                isFav
+                                    ? Icons.star_rounded
+                                    : Icons.star_border_rounded,
+                                color: isFav ? Colors.amber : null,
+                              ),
+                              onPressed: () =>
+                                  StoreFavoritesNotifier.instance.toggle(appId),
+                            ),
+                        ],
+                      ),
+                      if (_isInstalled && _installedPackageName.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        AppDetailLaunchButton(
+                          packageName: _installedPackageName,
+                          compact: true,
+                        ),
+                      ],
+                    ],
+                  ),
                 const SizedBox(height: 14),
 
                 // Genre + rating + tags

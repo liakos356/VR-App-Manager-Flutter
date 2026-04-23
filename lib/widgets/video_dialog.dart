@@ -1,7 +1,10 @@
-import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+/// Plays any video URL (direct file, HLS, YouTube, etc.) inside a WebView
+/// using an HTML5 <video> element.  This sidesteps ExoPlayer codec issues
+/// by delegating playback to the system WebView / Chromium engine.
 class VideoDialog extends StatefulWidget {
   final String videoUrl;
   const VideoDialog({super.key, required this.videoUrl});
@@ -11,49 +14,24 @@ class VideoDialog extends StatefulWidget {
 }
 
 class _VideoDialogState extends State<VideoDialog> {
-  late VideoPlayerController _videoPlayerController;
-  ChewieController? _chewieController;
+  late final WebViewController _controller;
 
   @override
   void initState() {
     super.initState();
-    _initializePlayer();
+    _controller = _makeController(widget.videoUrl);
   }
 
-  Future<void> _initializePlayer() async {
-    _videoPlayerController = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
-    );
-
-    try {
-      await _videoPlayerController.initialize();
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController,
-        autoPlay: true,
-        looping: false,
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Text(
-              errorMessage,
-              style: const TextStyle(color: Colors.white),
-            ),
-          );
-        },
-      );
-    } catch (e) {
-      debugPrint("Video init error: $e");
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _videoPlayerController.dispose();
-    _chewieController?.dispose();
-    super.dispose();
+  static WebViewController _makeController(String videoUrl) {
+    return WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (_) => NavigationDecision.navigate,
+        ),
+      )
+      ..loadRequest(Uri.parse(videoUrl));
   }
 
   @override
@@ -64,27 +42,133 @@ class _VideoDialogState extends State<VideoDialog> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1000),
         child: AspectRatio(
-          aspectRatio: _videoPlayerController.value.isInitialized
-              ? _videoPlayerController.value.aspectRatio
-              : 16 / 9,
+          aspectRatio: 16 / 9,
           child: Stack(
-            alignment: Alignment.center,
             children: [
-              if (_chewieController != null &&
-                  _chewieController!.videoPlayerController.value.isInitialized)
-                Chewie(controller: _chewieController!)
-              else
-                const Center(child: CircularProgressIndicator()),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: WebViewWidget.fromPlatformCreationParams(
+                  params:
+                      AndroidWebViewWidgetCreationParams.fromPlatformWebViewWidgetCreationParams(
+                        PlatformWebViewWidgetCreationParams(
+                          controller: _controller.platform,
+                        ),
+                        displayWithHybridComposition: true,
+                      ),
+                ),
+              ),
               Positioned(
-                top: -10,
-                right: -10,
-                child: IconButton(
-                  icon: const Icon(Icons.cancel, color: Colors.white, size: 36),
-                  onPressed: () => Navigator.of(context).pop(),
+                top: 4,
+                right: 4,
+                child: _CircleOverlayButton(
+                  icon: Icons.close,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+              ),
+              Positioned(
+                bottom: 4,
+                right: 4,
+                child: _CircleOverlayButton(
+                  icon: Icons.fullscreen,
+                  onTap: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.push(
+                      MaterialPageRoute<void>(
+                        fullscreenDialog: true,
+                        builder: (_) =>
+                            _VideoFullscreenPage(videoUrl: widget.videoUrl),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// -- Full-screen page ---------------------------------------------------------
+
+class _VideoFullscreenPage extends StatefulWidget {
+  final String videoUrl;
+  const _VideoFullscreenPage({required this.videoUrl});
+
+  @override
+  State<_VideoFullscreenPage> createState() => _VideoFullscreenPageState();
+}
+
+class _VideoFullscreenPageState extends State<_VideoFullscreenPage> {
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = _VideoDialogState._makeController(widget.videoUrl);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          WebViewWidget.fromPlatformCreationParams(
+            params:
+                AndroidWebViewWidgetCreationParams.fromPlatformWebViewWidgetCreationParams(
+                  PlatformWebViewWidgetCreationParams(
+                    controller: _controller.platform,
+                  ),
+                  displayWithHybridComposition: true,
+                ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            child: _CircleOverlayButton(
+              icon: Icons.close,
+              onTap: () {
+                final nav = Navigator.of(context);
+                nav.pop();
+                nav.pop();
+              },
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: _CircleOverlayButton(
+              icon: Icons.fullscreen_exit,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// -- Shared helper ------------------------------------------------------------
+
+class _CircleOverlayButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleOverlayButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: Colors.white, size: 28),
         ),
       ),
     );

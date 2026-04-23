@@ -17,6 +17,7 @@ class StoreFavoritesNotifier extends ValueNotifier<Set<String>> {
 
   /// Call once after the user signs in.  Loads their favorites from Supabase.
   Future<void> init(String userId) async {
+    debugPrint('StoreFavorites: init called with userId="$userId"');
     _userId = userId;
     await _reload();
   }
@@ -52,12 +53,19 @@ class StoreFavoritesNotifier extends ValueNotifier<Set<String>> {
 
   Future<void> _reload() async {
     if (_userId == null || _userId!.isEmpty) return;
-    final rows = await Supabase.instance.client
-        .from('favorite_apps')
-        .select('app_id')
-        .eq('user_id', _userId!);
-    value = Set.unmodifiable({
-      for (final row in rows as List<dynamic>) row['app_id'].toString(),
-    });
+    try {
+      final rows = await Supabase.instance.client
+          .from('favorite_apps')
+          .select('app_id')
+          .eq('user_id', _userId!);
+      value = Set.unmodifiable({
+        for (final row in rows as List<dynamic>) row['app_id'].toString(),
+      });
+      debugPrint(
+        'StoreFavorites: loaded ${value.length} favorites for $_userId',
+      );
+    } catch (e) {
+      debugPrint('StoreFavorites: _reload failed — $e');
+    }
   }
 }

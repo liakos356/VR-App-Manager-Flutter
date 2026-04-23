@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776938791879,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776956381739,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -16,8 +16,9 @@\n   // ── Public API ─────────────────────────────────────────────────────────────\n \n   /// Call once after the user signs in.  Loads their favorites from Supabase.\n   Future<void> init(String userId) async {\n+    debugPrint('StoreFavorites: init called with userId=\"$userId\"');\n     _userId = userId;\n     await _reload();\n   }\n \n@@ -51,13 +52,20 @@\n   // ── Private ────────────────────────────────────────────────────────────────\n \n   Future<void> _reload() async {\n     if (_userId == null || _userId!.isEmpty) return;\n-    final rows = await Supabase.instance.client\n-        .from('favorite_apps')\n-        .select('app_id')\n-        .eq('user_id', _userId!);\n-    value = Set.unmodifiable(\n-      {for (final row in rows as List<dynamic>) row['app_id'].toString()},\n-    );\n+    try {\n+      final rows = await Supabase.instance.client\n+          .from('favorite_apps')\n+          .select('app_id')\n+          .eq('user_id', _userId!);\n+      value = Set.unmodifiable({\n+        for (final row in rows as List<dynamic>) row['app_id'].toString(),\n+      });\n+      debugPrint(\n+        'StoreFavorites: loaded ${value.length} favorites for $_userId',\n+      );\n+    } catch (e) {\n+      debugPrint('StoreFavorites: _reload failed — $e');\n+    }\n   }\n }\n"
                 }
             ],
             "date": 1776938791879,

@@ -57,15 +57,20 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   void _clearSearch() {
     widget.controller.clear();
-    widget.controller.closeView('');
+    if (widget.controller.isOpen) {
+      widget.controller.closeView('');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return SearchAnchor(
       isFullScreen: false,
       searchController: widget.controller,
       viewConstraints: const BoxConstraints(maxHeight: 300),
+      viewBackgroundColor: colorScheme.surface,
+      viewHintText: 'Search apps...',
       viewOnSubmitted: (value) {
         widget.onSaveHistory(value);
         widget.controller.closeView(value);
@@ -115,10 +120,11 @@ class _AppSearchFieldState extends State<AppSearchField> {
   }
 
   Iterable<Widget> _buildHistoryItems(SearchController ctl) {
+    final colorScheme = Theme.of(context).colorScheme;
     final List<Widget> items = widget.searchHistory.map((String item) {
       return ListTile(
-        leading: const Icon(Icons.history),
-        title: Text(item),
+        leading: Icon(Icons.history, color: colorScheme.onSurface),
+        title: Text(item, style: TextStyle(color: colorScheme.onSurface)),
         onTap: () {
           ctl.closeView(item);
           widget.onSaveHistory(item);
@@ -149,6 +155,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
   }
 
   Iterable<Widget> _buildSuggestions(String query, SearchController ctl) {
+    final colorScheme = Theme.of(context).colorScheme;
     final Set<String> suggestions = {};
 
     for (final app in widget.apps) {
@@ -176,8 +183,8 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
     return suggestions.take(10).map((String suggestion) {
       return ListTile(
-        leading: const Icon(Icons.search),
-        title: Text(suggestion),
+        leading: Icon(Icons.search, color: colorScheme.onSurface),
+        title: Text(suggestion, style: TextStyle(color: colorScheme.onSurface)),
         onTap: () {
           ctl.closeView(suggestion);
           widget.onSaveHistory(suggestion);

@@ -43,12 +43,11 @@ dependencies:
   dart_smb2: ^0.0.5
   flutter_html: ^3.0.0
   auto_size_text: ^3.0.0
-  youtube_player_iframe: ^5.2.2
+  youtube_explode_dart: ^3.0.5
+  video_player: ^2.9.2
   shared_preferences: ^2.5.5
   permission_handler: ^12.0.1
   installed_apps: ^2.1.1
-  video_player: ^2.11.1
-  chewie: ^1.13.1
   cached_network_image: ^3.4.1
   supabase_flutter: ^2.8.4
   googleapis: ^13.2.0

@@ -1,9 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:installed_apps/installed_apps.dart';
 
 import '../utils/localization.dart';
 import 'trailer_dialog.dart';
 import 'video_dialog.dart';
+
+/// Extracts a YouTube video ID from common YouTube URL formats.
+/// Returns `null` when the URL is not a recognised YouTube URL.
+String? _extractYoutubeId(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return null;
+  final host = uri.host.toLowerCase();
+  // youtu.be/<id>
+  if (host == 'youtu.be') {
+    return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+  }
+  // youtube.com/watch?v=<id>  or  youtube.com/shorts/<id>  etc.
+  if (host.contains('youtube.com')) {
+    if (uri.queryParameters.containsKey('v')) {
+      return uri.queryParameters['v'];
+    }
+    // /embed/<id>
+    final segments = uri.pathSegments;
+    final embedIdx = segments.indexOf('embed');
+    if (embedIdx != -1 && embedIdx + 1 < segments.length) {
+      return segments[embedIdx + 1];
+    }
+    // /shorts/<id>
+    final shortsIdx = segments.indexOf('shorts');
+    if (shortsIdx != -1 && shortsIdx + 1 < segments.length) {
+      return segments[shortsIdx + 1];
+    }
+  }
+  return null;
+}
 
 /// Large install / uninstall button with an animated progress bar overlay.
 /// While a download is in progress, tapping the button cancels it.
@@ -34,10 +64,12 @@ class AppDetailInstallButton extends StatelessWidget {
     final bgColor = !isAvailable
         ? (isDark ? const Color(0xFF3A3A3A) : Colors.grey.shade300)
         : isInstalling
-        ? Colors.grey.shade800
+        ? (isDark ? const Color(0xFF424242) : Colors.grey.shade800)
         : isInstalled
-        ? Colors.red.shade600
-        : Theme.of(context).colorScheme.primary;
+        ? (isDark ? const Color(0xFFEF5350) : Colors.red.shade600)
+        : (isDark
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.9)
+              : Theme.of(context).colorScheme.primary);
 
     final contentColor = !isAvailable
         ? (isDark ? Colors.white30 : Colors.black26)
@@ -90,10 +122,7 @@ class AppDetailInstallButton extends StatelessWidget {
             child: InkWell(
               onTap: onTap,
               child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: hPad,
-                  vertical: vPad,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -121,11 +150,58 @@ class AppDetailInstallButton extends StatelessWidget {
   }
 }
 
+/// Button that launches the installed app by package name.
+class AppDetailLaunchButton extends StatelessWidget {
+  final String packageName;
+  final bool compact;
+  const AppDetailLaunchButton({
+    super.key,
+    required this.packageName,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: () async {
+        try {
+          await InstalledApps.startApp(packageName);
+        } catch (_) {}
+      },
+      icon: Icon(Icons.rocket_launch_rounded, size: compact ? 20 : 24),
+      label: Text(
+        'Launch',
+        style: TextStyle(
+          fontSize: compact ? 15 : 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 20 : 28,
+          vertical: compact ? 12 : 18,
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF66BB6A)
+            : Colors.green.shade600,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(compact ? 12 : 16),
+        ),
+      ),
+    );
+  }
+}
+
 /// Button that opens the YouTube trailer or a generic video dialog.
 class AppDetailTrailerButton extends StatelessWidget {
   final String videoUrl;
   final bool compact;
-  const AppDetailTrailerButton({super.key, required this.videoUrl, this.compact = false});
+  const AppDetailTrailerButton({
+    super.key,
+    required this.videoUrl,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,11 +211,13 @@ class AppDetailTrailerButton extends StatelessWidget {
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
           url = 'https://$url';
         }
-        final videoId = YoutubePlayerController.convertUrlToId(url);
+        final videoId = _extractYoutubeId(url);
         if (videoId != null && context.mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => TrailerDialog(videoId: videoId),
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (context) => TrailerDialog(videoId: videoId),
+            ),
           );
         } else if (context.mounted) {
           showDialog(
@@ -151,13 +229,25 @@ class AppDetailTrailerButton extends StatelessWidget {
       icon: Icon(Icons.play_circle_fill, size: compact ? 20 : 24),
       label: Text(
         tr('Watch Trailer'),
-        style: TextStyle(fontSize: compact ? 15 : 18, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: compact ? 15 : 18,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 28, vertical: compact ? 12 : 18),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(compact ? 12 : 16)),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 20 : 28,
+          vertical: compact ? 12 : 18,
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFFFFB300)
+            : Theme.of(context).colorScheme.secondary,
+        foregroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black87
+            : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(compact ? 12 : 16),
+        ),
       ),
     );
   }

@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776161883813,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776956386443,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -16,6 +16,11 @@\n         \"titleBar.activeBackground\": \"#dd0531\",\n         \"titleBar.activeForeground\": \"#e7e7e7\",\n         \"titleBar.inactiveBackground\": \"#dd053199\",\n         \"titleBar.inactiveForeground\": \"#e7e7e799\"\n-    }\n+    },\n+    \"peacock.color\": \"#dd0531\",\n+    \"kotlin.languageServer.enabled\": false,\n+    \"kotlin.languageServer.transport\": \"none\",\n+    \"kotlin.diagnostics.enabled\": false,\n+    \"kotlin.diagnosticsTimeout\": 0\n }\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1776161883813,

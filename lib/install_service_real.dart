@@ -17,6 +17,26 @@ const String _kSmbPassword = 'stella.elias.240922';
 class InstallService {
   static const platform = MethodChannel('com.vr.appmanager/install');
 
+  /// Attempts a silent install via `pm install` without a user dialog.
+  ///
+  /// Returns `true` on success. Requires the app to have been granted
+  /// `INSTALL_PACKAGES` permission (e.g. via ADB developer shell):
+  ///   adb shell pm grant com.vr.appmanager android.permission.INSTALL_PACKAGES
+  ///
+  /// Falls back gracefully: if this returns `false`, callers should use
+  /// [platform.invokeMethod('installApk', ...)] for the standard UI flow.
+  static Future<bool> silentInstallApk(String apkPath) async {
+    try {
+      final result = await platform.invokeMethod<bool>('silentInstallApk', {
+        'apkPath': apkPath,
+      });
+      return result ?? false;
+    } catch (e) {
+      debugPrint('[InstallService] silentInstallApk failed: $e');
+      return false;
+    }
+  }
+
   static Future<void> installAppLocally({
     required String appId,
     required String apkPath,
@@ -83,7 +103,9 @@ class InstallService {
             }
           }
         } catch (e) {
-          debugPrint('[InstallService] Drive search failed, falling back to SMB: $e');
+          debugPrint(
+            '[InstallService] Drive search failed, falling back to SMB: $e',
+          );
         }
         debugPrint('[InstallService] Not found on Drive, trying SMB...');
       }
@@ -401,15 +423,23 @@ class InstallService {
         '[InstallService] All files downloaded. Executing native install.',
       );
       onProgress('Triggering Native Install...');
-      final result = await platform.invokeMethod('installApk', {
-        'apkPath': apkFile.path,
-      });
-
-      if (result == true) {
-        debugPrint('[InstallService] Native install intent successful.');
-        onProgress('Installation Started!');
+      final silentOk = await silentInstallApk(apkFile.path);
+      if (silentOk) {
+        debugPrint('[InstallService] Silent install succeeded.');
+        onProgress('Installed!');
       } else {
-        throw Exception('Installation Intent Failed.');
+        debugPrint(
+          '[InstallService] Silent install unavailable; using UI intent.',
+        );
+        final result = await platform.invokeMethod('installApk', {
+          'apkPath': apkFile.path,
+        });
+        if (result == true) {
+          debugPrint('[InstallService] Native install intent successful.');
+          onProgress('Installation Started!');
+        } else {
+          throw Exception('Installation Intent Failed.');
+        }
       }
     } catch (e) {
       debugPrint('[InstallService] Error: $e');
@@ -589,15 +619,23 @@ class InstallService {
     // 5. Trigger native install
     debugPrint('[InstallService] All Drive files downloaded. Installing...');
     onProgress('Triggering Native Install...');
-    final result = await platform.invokeMethod('installApk', {
-      'apkPath': apkFile.path,
-    });
-
-    if (result == true) {
-      debugPrint('[InstallService] Native install intent successful.');
-      onProgress('Installation Started!');
+    final silentOk = await silentInstallApk(apkFile.path);
+    if (silentOk) {
+      debugPrint('[InstallService] Silent install succeeded.');
+      onProgress('Installed!');
     } else {
-      throw Exception('Installation Intent Failed.');
+      debugPrint(
+        '[InstallService] Silent install unavailable; using UI intent.',
+      );
+      final result = await platform.invokeMethod('installApk', {
+        'apkPath': apkFile.path,
+      });
+      if (result == true) {
+        debugPrint('[InstallService] Native install intent successful.');
+        onProgress('Installation Started!');
+      } else {
+        throw Exception('Installation Intent Failed.');
+      }
     }
   }
 
@@ -620,9 +658,7 @@ class InstallService {
       );
     }
 
-    debugPrint(
-      '[InstallService] Drive-by-ID install for $appId: $apkFileId',
-    );
+    debugPrint('[InstallService] Drive-by-ID install for $appId: $apkFileId');
 
     final apkFile = File('/sdcard/Download/$appId.apk');
     int totalSizeToDownload = apkSize;
@@ -654,8 +690,7 @@ class InstallService {
             final elapsed = now.difference(lastSpeedTime).inMilliseconds;
             if (elapsed >= 500) {
               final speedBytes = totalDownloaded - speedTracker;
-              final speedMbps =
-                  (speedBytes / 1024 / 1024) / (elapsed / 1000);
+              final speedMbps = (speedBytes / 1024 / 1024) / (elapsed / 1000);
               onProgress('${speedMbps.toStringAsFixed(1)} MB/s');
               speedTracker = totalDownloaded;
               lastSpeedTime = now;
@@ -697,7 +732,9 @@ class InstallService {
                 'size': size,
               });
               totalSizeToDownload += size;
-              debugPrint('[InstallService] Found Drive OBB: $name ($size bytes)');
+              debugPrint(
+                '[InstallService] Found Drive OBB: $name ($size bytes)',
+              );
             }
           }
         }
@@ -717,8 +754,7 @@ class InstallService {
         }
       }
       for (final obb in obbFilesToDownload) {
-        final localFile =
-            File('${localObbDir.path}/${obb['name'] as String}');
+        final localFile = File('${localObbDir.path}/${obb['name'] as String}');
         final success = await downloadDriveFile(
           obb['fileId'] as String,
           localFile,
@@ -740,15 +776,23 @@ class InstallService {
     // Trigger native install
     debugPrint('[InstallService] All Drive files downloaded. Installing...');
     onProgress('Triggering Native Install...');
-    final result = await platform.invokeMethod('installApk', {
-      'apkPath': apkFile.path,
-    });
-
-    if (result == true) {
-      debugPrint('[InstallService] Native install intent successful.');
-      onProgress('Installation Started!');
+    final silentOk = await silentInstallApk(apkFile.path);
+    if (silentOk) {
+      debugPrint('[InstallService] Silent install succeeded.');
+      onProgress('Installed!');
     } else {
-      throw Exception('Installation Intent Failed.');
+      debugPrint(
+        '[InstallService] Silent install unavailable; using UI intent.',
+      );
+      final result = await platform.invokeMethod('installApk', {
+        'apkPath': apkFile.path,
+      });
+      if (result == true) {
+        debugPrint('[InstallService] Native install intent successful.');
+        onProgress('Installation Started!');
+      } else {
+        throw Exception('Installation Intent Failed.');
+      }
     }
   }
 }
