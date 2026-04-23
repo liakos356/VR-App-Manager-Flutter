@@ -21,6 +21,10 @@ class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showInstalledApps;
   final ValueChanged<bool> onToggleInstalledApps;
 
+  // Favorites-only filter
+  final bool favoritesOnly;
+  final ValueChanged<bool> onFavoritesOnlyChanged;
+
   const MainFilterBar({
     super.key,
     required this.viewMode,
@@ -33,6 +37,8 @@ class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onSortChanged,
     this.showInstalledApps = false,
     required this.onToggleInstalledApps,
+    this.favoritesOnly = false,
+    required this.onFavoritesOnlyChanged,
   });
 
   @override
@@ -136,6 +142,58 @@ class MainFilterBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ],
           const Spacer(),
+
+          // ── Favorites-only toggle ─────────────────────────────────────
+          if (!showInstalledApps) ...[
+            Tooltip(
+              message: favoritesOnly ? 'Show all apps' : 'Show favorites only',
+              child: Material(
+                elevation: favoritesOnly ? 3 : 2,
+                borderRadius: BorderRadius.circular(20),
+                color: favoritesOnly
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).cardColor,
+                child: InkWell(
+                  onTap: () => onFavoritesOnlyChanged(!favoritesOnly),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          favoritesOnly
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 16,
+                          color: favoritesOnly
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          tr('Favorites'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: favoritesOnly
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: favoritesOnly
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
 
           if (!showInstalledApps) ...[
             SegmentedButton<String>(

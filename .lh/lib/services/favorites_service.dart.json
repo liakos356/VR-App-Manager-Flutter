@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/services/favorites_service.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776938792142,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776938792142,
+            "name": "Commit-0",
+            "content": "import 'package:shared_preferences/shared_preferences.dart';\n\nclass FavoritesService {\n  static const _key = 'favorite_installed_apps';\n\n  static Future<Set<String>> loadFavorites() async {\n    final prefs = await SharedPreferences.getInstance();\n    final list = prefs.getStringList(_key) ?? [];\n    return list.toSet();\n  }\n\n  static Future<void> saveFavorites(Set<String> favorites) async {\n    final prefs = await SharedPreferences.getInstance();\n    await prefs.setStringList(_key, favorites.toList());\n  }\n\n  static Future<void> addFavorite(String packageName) async {\n    final favorites = await loadFavorites();\n    favorites.add(packageName);\n    await saveFavorites(favorites);\n  }\n\n  static Future<void> removeFavorite(String packageName) async {\n    final favorites = await loadFavorites();\n    favorites.remove(packageName);\n    await saveFavorites(favorites);\n  }\n}\n"
+        }
+    ]
+}

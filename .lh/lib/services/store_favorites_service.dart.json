@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/services/store_favorites_service.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1776938791879,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1776938791879,
+            "name": "Commit-0",
+            "content": "import 'package:flutter/foundation.dart';\nimport 'package:supabase_flutter/supabase_flutter.dart';\n\n/// Global singleton that tracks which store app IDs the signed-in user\n/// has marked as favorites.\n///\n/// Backed by the `favorite_apps` Supabase table.  Identified by the\n/// Google user e-mail (passed from [GoogleDriveService.userNotifier]).\nclass StoreFavoritesNotifier extends ValueNotifier<Set<String>> {\n  StoreFavoritesNotifier._() : super(const {});\n\n  static final StoreFavoritesNotifier instance = StoreFavoritesNotifier._();\n\n  String? _userId;\n\n  // ── Public API ─────────────────────────────────────────────────────────────\n\n  /// Call once after the user signs in.  Loads their favorites from Supabase.\n  Future<void> init(String userId) async {\n    _userId = userId;\n    await _reload();\n  }\n\n  /// Clears in-memory state when the user signs out.\n  void clear() {\n    _userId = null;\n    value = const {};\n  }\n\n  /// Adds or removes [appId] from the user's favorites and persists the change.\n  Future<void> toggle(String appId) async {\n    if (_userId == null || _userId!.isEmpty) return;\n    if (value.contains(appId)) {\n      await Supabase.instance.client\n          .from('favorite_apps')\n          .delete()\n          .eq('user_id', _userId!)\n          .eq('app_id', appId);\n      value = Set.unmodifiable({...value}..remove(appId));\n    } else {\n      await Supabase.instance.client.from('favorite_apps').insert({\n        'user_id': _userId!,\n        'app_id': appId,\n      });\n      value = Set.unmodifiable({...value, appId});\n    }\n  }\n\n  bool isFavorite(String appId) => value.contains(appId);\n\n  // ── Private ────────────────────────────────────────────────────────────────\n\n  Future<void> _reload() async {\n    if (_userId == null || _userId!.isEmpty) return;\n    final rows = await Supabase.instance.client\n        .from('favorite_apps')\n        .select('app_id')\n        .eq('user_id', _userId!);\n    value = Set.unmodifiable(\n      {for (final row in rows as List<dynamic>) row['app_id'].toString()},\n    );\n  }\n}\n"
+        }
+    ]
+}

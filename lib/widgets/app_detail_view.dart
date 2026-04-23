@@ -5,6 +5,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:installed_apps/installed_apps.dart';
 
 import '../install_service.dart';
+import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import '../utils/installed_apps_cache.dart';
@@ -58,6 +59,7 @@ class _AppDetailViewState extends State<AppDetailView>
     super.initState();
     _updateDerivedFields();
     WidgetsBinding.instance.addObserver(this);
+    StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
     _refreshInstallState();
   }
 
@@ -72,8 +74,13 @@ class _AppDetailViewState extends State<AppDetailView>
 
   @override
   void dispose() {
+    StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -199,6 +206,8 @@ class _AppDetailViewState extends State<AppDetailView>
 
   @override
   Widget build(BuildContext context) {
+    final appId = widget.app['id']?.toString() ?? '';
+    final isFav = StoreFavoritesNotifier.instance.isFavorite(appId);
     if (widget.showAsPage) {
       return Scaffold(
         appBar: AppBar(
@@ -207,12 +216,23 @@ class _AppDetailViewState extends State<AppDetailView>
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(_appName),
+          actions: [
+            if (appId.isNotEmpty)
+              IconButton(
+                tooltip: isFav ? 'Remove from favorites' : 'Add to favorites',
+                icon: Icon(
+                  isFav ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: isFav ? Colors.amber : null,
+                ),
+                onPressed: () => StoreFavoritesNotifier.instance.toggle(appId),
+              ),
+          ],
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: _buildWideBody(context),
       );
     }
-    return _buildPanelBody(context);
+    return _buildPanelBody(context, appId: appId, isFav: isFav);
   }
 
   // ── Full-screen two-column layout (used when pushed as a page) ────────────
@@ -309,14 +329,24 @@ class _AppDetailViewState extends State<AppDetailView>
                         AppDetailInstallButton(
                           isInstalled: _isInstalled,
                           isInstalling: _isInstalling,
-                          isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
+                          isAvailable:
+                              (widget.app['apk_path']
+                                  ?.toString()
+                                  .trim()
+                                  .isNotEmpty ??
+                              false),
                           installProgress: _installProgress,
                           installStatus: _installStatus,
-                          onTap: (widget.app['apk_path']?.toString().trim().isEmpty ?? true)
+                          onTap:
+                              (widget.app['apk_path']
+                                      ?.toString()
+                                      .trim()
+                                      .isEmpty ??
+                                  true)
                               ? null
                               : (_isInstalling
-                                  ? () => setState(() => _isCancelled = true)
-                                  : _handleInstallTap),
+                                    ? () => setState(() => _isCancelled = true)
+                                    : _handleInstallTap),
                         ),
                         if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
                           const SizedBox(height: 12),
@@ -365,7 +395,11 @@ class _AppDetailViewState extends State<AppDetailView>
 
   // ── Compact single-column layout (used inside the split panel) ────────────
 
-  Widget _buildPanelBody(BuildContext context) {
+  Widget _buildPanelBody(
+    BuildContext context, {
+    required String appId,
+    required bool isFav,
+  }) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,11 +429,9 @@ class _AppDetailViewState extends State<AppDetailView>
                     '${getObbSize(widget.app) > 0 ? '  (APK: ${formatBytes(getApkSize(widget.app))} + OBB: ${formatBytes(getObbSize(widget.app))})' : ''}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.6),
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -412,14 +444,24 @@ class _AppDetailViewState extends State<AppDetailView>
                       child: AppDetailInstallButton(
                         isInstalled: _isInstalled,
                         isInstalling: _isInstalling,
-                        isAvailable: (widget.app['apk_path']?.toString().trim().isNotEmpty ?? false),
+                        isAvailable:
+                            (widget.app['apk_path']
+                                ?.toString()
+                                .trim()
+                                .isNotEmpty ??
+                            false),
                         installProgress: _installProgress,
                         installStatus: _installStatus,
-                        onTap: (widget.app['apk_path']?.toString().trim().isEmpty ?? true)
+                        onTap:
+                            (widget.app['apk_path']
+                                    ?.toString()
+                                    .trim()
+                                    .isEmpty ??
+                                true)
                             ? null
                             : (_isInstalling
-                                ? () => setState(() => _isCancelled = true)
-                                : _handleInstallTap),
+                                  ? () => setState(() => _isCancelled = true)
+                                  : _handleInstallTap),
                         compact: true,
                       ),
                     ),
@@ -430,6 +472,22 @@ class _AppDetailViewState extends State<AppDetailView>
                           videoUrl: _videoUrl!,
                           compact: true,
                         ),
+                      ),
+                    ],
+                    if (appId.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: isFav
+                            ? 'Remove from favorites'
+                            : 'Add to favorites',
+                        icon: Icon(
+                          isFav
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: isFav ? Colors.amber : null,
+                        ),
+                        onPressed: () =>
+                            StoreFavoritesNotifier.instance.toggle(appId),
                       ),
                     ],
                   ],

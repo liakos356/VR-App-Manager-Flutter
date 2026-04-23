@@ -109,7 +109,7 @@ bool _fuzzyMatch(String text, String query) {
 
 // ── Filter + sort ─────────────────────────────────────────────────────────────
 
-/// Applies search, genre, ovrport, type, and availability filters, then sorts.
+/// Applies search, genre, ovrport, type, availability, and favorites filters, then sorts.
 List<dynamic> filteredAndSorted(
   List<dynamic> apps, {
   required String searchQuery,
@@ -119,6 +119,9 @@ List<dynamic> filteredAndSorted(
   required String sortOption,
   bool availableOnly = false,
   bool updatedRecentlyFilter = false,
+  int updatedRecentlyDays = 7,
+  bool favoritesOnly = false,
+  Set<String> favoriteIds = const {},
 }) {
   final query = searchQuery.toLowerCase();
 
@@ -134,9 +137,7 @@ List<dynamic> filteredAndSorted(
 
     final matchesGenre =
         genreFilter == 'All Genres' ||
-        _parseGenres(genreRaw).any(
-          (g) => g == genreFilter.toLowerCase(),
-        );
+        _parseGenres(genreRaw).any((g) => g == genreFilter.toLowerCase());
 
     final matchesOvrport =
         !ovrportFilter ||
@@ -154,14 +155,23 @@ List<dynamic> filteredAndSorted(
 
     bool matchesUpdatedRecently = true;
     if (updatedRecentlyFilter) {
-      final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
-      final updatedAt =
-          DateTime.tryParse(app['updated_at']?.toString() ?? '');
-      matchesUpdatedRecently =
-          updatedAt != null && updatedAt.isAfter(oneWeekAgo);
+      final cutoff = DateTime.now().subtract(
+        Duration(days: updatedRecentlyDays),
+      );
+      final updatedAt = DateTime.tryParse(app['updated_at']?.toString() ?? '');
+      matchesUpdatedRecently = updatedAt != null && updatedAt.isAfter(cutoff);
     }
 
-    return matchesSearch && matchesGenre && matchesOvrport && matchesType && matchesAvailability && matchesUpdatedRecently;
+    final matchesFavorites =
+        !favoritesOnly || favoriteIds.contains((app['id'] ?? '').toString());
+
+    return matchesSearch &&
+        matchesGenre &&
+        matchesOvrport &&
+        matchesType &&
+        matchesAvailability &&
+        matchesUpdatedRecently &&
+        matchesFavorites;
   }).toList();
 
   filtered.sort((a, b) => _compare(a, b, sortOption));
