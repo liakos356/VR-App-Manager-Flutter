@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 
+import '../services/favorites_service.dart';
 import '../utils/installed_apps_cache.dart';
 
 enum AppViewMode { list, grid }
 
-enum AppSortOption { name, packageName }
+enum AppSortOption { installTime, name, packageName }
 
 enum AppSortDirection { asc, desc }
+
+const Duration _newAppThreshold = Duration(days: 7);
 
 class InstalledAppsScreen extends StatefulWidget {
   final String searchQuery;
@@ -37,15 +40,18 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   // Selection state
   bool _isSelectionMode = false;
   final Set<String> _selectedPackages = {};
-
+  // Favorites state
+  Set<String> _favoritePackages = {};
+  bool _showFavoritesOnly = false;
   // Search & Filter state
-  AppSortOption _sortOption = AppSortOption.name;
-  AppSortDirection _sortDirection = AppSortDirection.asc;
+  AppSortOption _sortOption = AppSortOption.installTime;
+  AppSortDirection _sortDirection = AppSortDirection.desc;
 
   @override
   void initState() {
     super.initState();
     _loadInstalledApps();
+    _loadFavorites();
   }
 
   @override
@@ -67,6 +73,44 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
     } catch (e) {
       debugPrint('Error loading installed apps: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadFavorites() async {
+    final favs = await FavoritesService.loadFavorites();
+    if (mounted) setState(() => _favoritePackages = favs);
+  }
+
+  Future<void> _toggleFavorite(String packageName) async {
+    final isFav = _favoritePackages.contains(packageName);
+    if (isFav) {
+      await FavoritesService.removeFavorite(packageName);
+      if (mounted) setState(() => _favoritePackages.remove(packageName));
+    } else {
+      await FavoritesService.addFavorite(packageName);
+      if (mounted) setState(() => _favoritePackages.add(packageName));
+    }
+  }
+
+  Future<void> _massToggleFavorites() async {
+    final allFav = _selectedPackages.every(
+      (pkg) => _favoritePackages.contains(pkg),
+    );
+    for (final pkg in _selectedPackages) {
+      if (allFav) {
+        await FavoritesService.removeFavorite(pkg);
+      } else {
+        await FavoritesService.addFavorite(pkg);
+      }
+    }
+    if (mounted) {
+      setState(() {
+        if (allFav) {
+          _favoritePackages.removeAll(_selectedPackages);
+        } else {
+          _favoritePackages.addAll(_selectedPackages);
+        }
+      });
     }
   }
 
@@ -155,13 +199,20 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   List<AppInfo> get _filteredAndSortedApps {
     final query = widget.searchQuery.toLowerCase();
     var filtered = _allApps.where((app) {
-      return app.name.toLowerCase().contains(query) ||
+      final matchesQuery =
+          app.name.toLowerCase().contains(query) ||
           app.packageName.toLowerCase().contains(query);
+      final matchesFavorites =
+          !_showFavoritesOnly || _favoritePackages.contains(app.packageName);
+      return matchesQuery && matchesFavorites;
     }).toList();
 
     filtered.sort((a, b) {
       int comparison;
       switch (_sortOption) {
+        case AppSortOption.installTime:
+          comparison = a.installedTimestamp.compareTo(b.installedTimestamp);
+          break;
         case AppSortOption.name:
           comparison = a.name.compareTo(b.name);
           break;
@@ -302,6 +353,10 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                 underline: const SizedBox(),
                 items: const [
                   DropdownMenuItem(
+                    value: AppSortOption.installTime,
+                    child: Text('Install Time'),
+                  ),
+                  DropdownMenuItem(
                     value: AppSortOption.name,
                     child: Text('Name'),
                   ),
@@ -333,6 +388,18 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
 
               if (!_isSelectionMode)
                 IconButton(
+                  icon: Icon(
+                    _showFavoritesOnly ? Icons.star : Icons.star_border,
+                    color: _showFavoritesOnly ? Colors.amber : null,
+                  ),
+                  onPressed: () =>
+                      setState(() => _showFavoritesOnly = !_showFavoritesOnly),
+                  tooltip: _showFavoritesOnly
+                      ? 'Show All Apps'
+                      : 'Show Favorites Only',
+                ),
+              if (!_isSelectionMode)
+                IconButton(
                   icon: const Icon(Icons.checklist),
                   onPressed: () => setState(() => _isSelectionMode = true),
                   tooltip: 'Select Apps',
@@ -350,6 +417,33 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     }
                   }),
                   tooltip: 'Select All',
+                ),
+                IconButton(
+                  icon: Icon(
+                    _selectedPackages.isNotEmpty &&
+                            _selectedPackages.every(
+                              (pkg) => _favoritePackages.contains(pkg),
+                            )
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color:
+                        _selectedPackages.isNotEmpty &&
+                            _selectedPackages.every(
+                              (pkg) => _favoritePackages.contains(pkg),
+                            )
+                        ? Colors.amber
+                        : null,
+                  ),
+                  onPressed: _selectedPackages.isEmpty
+                      ? null
+                      : _massToggleFavorites,
+                  tooltip:
+                      _selectedPackages.isNotEmpty &&
+                          _selectedPackages.every(
+                            (pkg) => _favoritePackages.contains(pkg),
+                          )
+                      ? 'Remove from Favorites'
+                      : 'Add to Favorites',
                 ),
                 IconButton(
                   icon: const Icon(
@@ -460,12 +554,21 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
     );
   }
 
+  bool _isNewApp(AppInfo app) {
+    if (app.installedTimestamp == 0) return false;
+    final installed = DateTime.fromMillisecondsSinceEpoch(
+      app.installedTimestamp,
+    );
+    return DateTime.now().difference(installed) <= _newAppThreshold;
+  }
+
   Widget _buildListView(List<AppInfo> apps) {
     return ListView.builder(
       itemCount: apps.length,
       itemBuilder: (context, index) {
         final app = apps[index];
         final isSelected = _selectedPackages.contains(app.packageName);
+        final isNew = _isNewApp(app);
 
         return ListTile(
           onTap: _isSelectionMode
@@ -487,11 +590,62 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
           leading: SizedBox(
             width: _baseSize,
             height: _baseSize,
-            child: app.icon != null
-                ? Image.memory(app.icon!, fit: BoxFit.contain)
-                : const Icon(Icons.android),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: app.icon != null
+                      ? Image.memory(app.icon!, fit: BoxFit.contain)
+                      : const Icon(Icons.android),
+                ),
+                if (!_isSelectionMode)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: () => _toggleFavorite(app.packageName),
+                      child: Icon(
+                        _favoritePackages.contains(app.packageName)
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: _favoritePackages.contains(app.packageName)
+                            ? Colors.amber
+                            : Colors.white70,
+                        size: 16,
+                        shadows: const [
+                          Shadow(color: Colors.black54, blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-          title: Text(app.name),
+          title: Row(
+            children: [
+              Text(app.name),
+              if (isNew) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'NEW',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
           subtitle: Text('${app.packageName}\nv${app.versionName}'),
           isThreeLine: true,
           trailing: _isSelectionMode
@@ -540,6 +694,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
       itemBuilder: (context, index) {
         final app = apps[index];
         final isSelected = _selectedPackages.contains(app.packageName);
+        final isNew = _isNewApp(app);
 
         return Card(
           elevation: isSelected ? 4 : 1,
@@ -573,9 +728,41 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Expanded(
-                        child: app.icon != null
-                            ? Image.memory(app.icon!, fit: BoxFit.contain)
-                            : const Icon(Icons.android, size: 40),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: app.icon != null
+                                  ? Image.memory(app.icon!, fit: BoxFit.contain)
+                                  : const Icon(Icons.android, size: 40),
+                            ),
+                            if (!_isSelectionMode)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: () => _toggleFavorite(app.packageName),
+                                  child: Icon(
+                                    _favoritePackages.contains(app.packageName)
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color:
+                                        _favoritePackages.contains(
+                                          app.packageName,
+                                        )
+                                        ? Colors.amber
+                                        : Colors.white70,
+                                    size: 18,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black54,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -588,6 +775,30 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     ],
                   ),
                 ),
+                if (isNew && !_isSelectionMode)
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
                 if (_isSelectionMode)
                   Positioned(
                     top: 4,
@@ -602,7 +813,15 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     top: 0,
                     right: 0,
                     child: PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, size: 20),
+                      icon: const Icon(
+                        Icons.more_vert,
+                        size: 20,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(color: Colors.black87, blurRadius: 8),
+                          Shadow(color: Colors.black54, blurRadius: 3),
+                        ],
+                      ),
                       padding: EdgeInsets.zero,
                       onSelected: (value) {
                         if (value == 'launch') {

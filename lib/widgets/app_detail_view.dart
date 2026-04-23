@@ -5,6 +5,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:installed_apps/installed_apps.dart';
 
 import '../install_service.dart';
+import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import '../utils/installed_apps_cache.dart';
@@ -58,6 +59,7 @@ class _AppDetailViewState extends State<AppDetailView>
     super.initState();
     _updateDerivedFields();
     WidgetsBinding.instance.addObserver(this);
+    StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
     _refreshInstallState();
   }
 
@@ -72,8 +74,13 @@ class _AppDetailViewState extends State<AppDetailView>
 
   @override
   void dispose() {
+    StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -199,6 +206,8 @@ class _AppDetailViewState extends State<AppDetailView>
 
   @override
   Widget build(BuildContext context) {
+    final appId = widget.app['id']?.toString() ?? '';
+    final isFav = StoreFavoritesNotifier.instance.isFavorite(appId);
     if (widget.showAsPage) {
       return Scaffold(
         appBar: AppBar(
@@ -207,12 +216,23 @@ class _AppDetailViewState extends State<AppDetailView>
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(_appName),
+          actions: [
+            if (appId.isNotEmpty)
+              IconButton(
+                tooltip: isFav ? 'Remove from favorites' : 'Add to favorites',
+                icon: Icon(
+                  isFav ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: isFav ? Colors.amber : null,
+                ),
+                onPressed: () => StoreFavoritesNotifier.instance.toggle(appId),
+              ),
+          ],
         ),
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: _buildWideBody(context),
       );
     }
-    return _buildPanelBody(context);
+    return _buildPanelBody(context, appId: appId, isFav: isFav);
   }
 
   // ── Full-screen two-column layout (used when pushed as a page) ────────────
@@ -365,7 +385,11 @@ class _AppDetailViewState extends State<AppDetailView>
 
   // ── Compact single-column layout (used inside the split panel) ────────────
 
-  Widget _buildPanelBody(BuildContext context) {
+  Widget _buildPanelBody(
+    BuildContext context, {
+    required String appId,
+    required bool isFav,
+  }) {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,6 +454,22 @@ class _AppDetailViewState extends State<AppDetailView>
                           videoUrl: _videoUrl!,
                           compact: true,
                         ),
+                      ),
+                    ],
+                    if (appId.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: isFav
+                            ? 'Remove from favorites'
+                            : 'Add to favorites',
+                        icon: Icon(
+                          isFav
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: isFav ? Colors.amber : null,
+                        ),
+                        onPressed: () =>
+                            StoreFavoritesNotifier.instance.toggle(appId),
                       ),
                     ],
                   ],

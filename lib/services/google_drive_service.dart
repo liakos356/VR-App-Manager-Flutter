@@ -37,6 +37,31 @@ class GoogleUserInfo {
   const GoogleUserInfo({required this.email, this.displayName, this.photoUrl});
 }
 
+/// A single `YYYYMMDD_HHMM_store.apk` entry found on Google Drive.
+class StoreApkEntry {
+  final String fileId;
+  final String fileName;
+  final DateTime timestamp;
+  final int sizeBytes;
+
+  const StoreApkEntry({
+    required this.fileId,
+    required this.fileName,
+    required this.timestamp,
+    required this.sizeBytes,
+  });
+
+  /// The `YYYYMMDD_HHMM` portion used as a human-readable build identifier.
+  String get buildId {
+    final y = timestamp.year.toString().padLeft(4, '0');
+    final mo = timestamp.month.toString().padLeft(2, '0');
+    final d = timestamp.day.toString().padLeft(2, '0');
+    final h = timestamp.hour.toString().padLeft(2, '0');
+    final mi = timestamp.minute.toString().padLeft(2, '0');
+    return '${y}${mo}${d}_${h}${mi}';
+  }
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 /// Singleton that manages Google OAuth 2.0 tokens and Drive file access.
@@ -366,6 +391,51 @@ class GoogleDriveService {
     final files = result.files;
     if (files == null || files.isEmpty) return null;
     return files.first;
+  }
+
+  // ── Store APK helpers ────────────────────────────────────────────────────────
+
+  static const String _kStoreFolder = 'google_drive/pico4/store';
+
+  /// Parses `YYYYMMDD_HHMM_store.apk` → [DateTime], returns null on mismatch.
+  static DateTime? parseApkTimestamp(String fileName) {
+    final match = RegExp(
+      r'^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})_store\.apk$',
+    ).firstMatch(fileName);
+    if (match == null) return null;
+    return DateTime(
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+      int.parse(match.group(4)!),
+      int.parse(match.group(5)!),
+    );
+  }
+
+  /// Lists all `*_store.apk` files in the `pico4/store` Drive folder,
+  /// sorted newest-first.
+  Future<List<StoreApkEntry>> listStoreApks() async {
+    final files = await listFiles(_kStoreFolder);
+    final entries = <StoreApkEntry>[];
+    for (final f in files) {
+      if (f.name == null) continue;
+      final ts = parseApkTimestamp(f.name!);
+      if (ts == null) continue;
+      entries.add(StoreApkEntry(
+        fileId: f.id ?? '',
+        fileName: f.name!,
+        timestamp: ts,
+        sizeBytes: int.tryParse(f.size ?? '0') ?? 0,
+      ));
+    }
+    entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return entries;
+  }
+
+  /// Returns the latest `StoreApkEntry`, or null if none are found.
+  Future<StoreApkEntry?> latestStoreApk() async {
+    final list = await listStoreApks();
+    return list.isEmpty ? null : list.first;
   }
 
   /// Downloads a Drive file to [localFile] with progress callbacks.

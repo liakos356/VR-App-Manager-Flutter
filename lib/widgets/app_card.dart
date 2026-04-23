@@ -4,6 +4,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import 'app_detail_view.dart';
@@ -45,6 +46,11 @@ class AppCardState extends State<AppCard> {
     super.initState();
     _cachedImages = _computeImages();
     _refreshInstallState();
+    StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -57,6 +63,7 @@ class AppCardState extends State<AppCard> {
 
   @override
   void dispose() {
+    StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     // Do NOT evict images from CachedNetworkImage's disk/memory cache here.
     // Evicting on dispose defeats the purpose of caching: images would need
     // to be re-downloaded every time a card re-enters the viewport while
@@ -332,6 +339,14 @@ class AppCardState extends State<AppCard> {
                                 ),
                               ),
                             ),
+                          // ── Favorite star ───────────────────────────────
+                          Positioned(
+                            bottom: 6,
+                            right: 6,
+                            child: _FavoriteStarButton(
+                              appId: widget.app['id']?.toString() ?? '',
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -440,6 +455,35 @@ class AppCardState extends State<AppCard> {
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+/// Small star button that reflects and toggles the favorite state for [appId].
+class _FavoriteStarButton extends StatelessWidget {
+  final String appId;
+  const _FavoriteStarButton({required this.appId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (appId.isEmpty) return const SizedBox.shrink();
+    final isFav = StoreFavoritesNotifier.instance.isFavorite(appId);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => StoreFavoritesNotifier.instance.toggle(appId),
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Colors.black45,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          isFav ? Icons.star_rounded : Icons.star_border_rounded,
+          color: isFav ? Colors.amber : Colors.white70,
+          size: 20,
+        ),
+      ),
+    );
+  }
+}
 
 /// Image strip with hover-activated prev/next navigation and dot indicators.
 class _CardImageCarousel extends StatelessWidget {

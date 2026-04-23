@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../db_service.dart';
 import '../services/google_drive_service.dart';
+import '../services/store_favorites_service.dart';
 import '../utils/app_filter.dart' as filter;
 import '../utils/localization.dart';
 import '../widgets/adjustable_split_view.dart';
@@ -14,6 +15,7 @@ import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/genre_side_panel.dart';
 import '../widgets/main_filter_bar.dart';
+import 'app_updater_screen.dart';
 import 'installed_apps_screen.dart';
 
 const String _kApiUrl = 'http://192.168.1.17:8001/api';
@@ -56,7 +58,9 @@ class MainScreenState extends State<MainScreen> {
   bool _ovrportFilter = false;
   bool _availableOnly = false;
   bool _updatedRecentlyFilter = false;
+  int _updatedRecentlyDays = 7;
   String _typeFilter = 'all';
+  bool _favoritesOnly = false;
 
   // ── View state ────────────────────────────────────────────────────────────
 
@@ -93,6 +97,14 @@ class MainScreenState extends State<MainScreen> {
       _loadSearchHistory(prefs);
     });
     _fetchApps();
+    // Init store favorites for the currently signed-in Google user.
+    final userEmail = GoogleDriveService().userNotifier.value?.email;
+    if (userEmail != null && userEmail.isNotEmpty) {
+      StoreFavoritesNotifier.instance.init(userEmail);
+    }
+    // Refilter whenever favorites change (e.g. user toggles a favorite while
+    // the favorites-only filter is active).
+    StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
     _searchController.addListener(() {
       _searchDebounce?.cancel();
       _searchDebounce = Timer(const Duration(milliseconds: 200), () {
@@ -113,10 +125,15 @@ class MainScreenState extends State<MainScreen> {
     _searchDebounce?.cancel();
     _searchController.dispose();
     _cardSizeNotifier.dispose();
+    StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     super.dispose();
   }
 
   // ── Preferences persistence ───────────────────────────────────────────────
+
+  void _onFavoritesChanged() {
+    if (mounted && _favoritesOnly) setState(() => _refilter());
+  }
 
   void _loadPreferences(SharedPreferences prefs) {
     if (!mounted) return;
@@ -126,10 +143,12 @@ class MainScreenState extends State<MainScreen> {
       _ovrportFilter = prefs.getBool('ovrportFilter') ?? false;
       _availableOnly = prefs.getBool('availableOnly') ?? false;
       _updatedRecentlyFilter = prefs.getBool('updatedRecentlyFilter') ?? false;
+      _updatedRecentlyDays = prefs.getInt('updatedRecentlyDays') ?? 7;
       _typeFilter = prefs.getString('typeFilter') ?? 'all';
       _viewMode = prefs.getString('viewMode') ?? 'grid';
       _genreSidebarOpen = prefs.getBool('genreSidebarOpen') ?? true;
       _cardSizeNotifier.value = prefs.getDouble('cardSize') ?? 1.0;
+      _favoritesOnly = prefs.getBool('favoritesOnly') ?? false;
       _refilter();
     });
   }
@@ -143,10 +162,12 @@ class MainScreenState extends State<MainScreen> {
       await prefs.setBool('ovrportFilter', _ovrportFilter);
       await prefs.setBool('availableOnly', _availableOnly);
       await prefs.setBool('updatedRecentlyFilter', _updatedRecentlyFilter);
+      await prefs.setInt('updatedRecentlyDays', _updatedRecentlyDays);
       await prefs.setString('typeFilter', _typeFilter);
       await prefs.setString('viewMode', _viewMode);
       await prefs.setBool('genreSidebarOpen', _genreSidebarOpen);
       await prefs.setDouble('cardSize', _cardSizeNotifier.value);
+      await prefs.setBool('favoritesOnly', _favoritesOnly);
     });
   }
 
@@ -192,7 +213,9 @@ class MainScreenState extends State<MainScreen> {
       final result = await fetchAppsFromDb(
         'smb://100.95.32.89/ssd_internal/downloads/pico4/apps/apps.db',
         forceRefresh: forceRefresh,
-        onProgress: silent ? null : (p) => setState(() => _downloadProgress = p),
+        onProgress: silent
+            ? null
+            : (p) => setState(() => _downloadProgress = p),
         page: 0,
       );
       setState(() {
@@ -255,8 +278,11 @@ class MainScreenState extends State<MainScreen> {
       ovrportFilter: _ovrportFilter,
       availableOnly: _availableOnly,
       updatedRecentlyFilter: _updatedRecentlyFilter,
+      updatedRecentlyDays: _updatedRecentlyDays,
       typeFilter: _typeFilter,
       sortOption: _sortOption,
+      favoritesOnly: _favoritesOnly,
+      favoriteIds: StoreFavoritesNotifier.instance.value,
     );
 
     // Compute genre metadata once here so build() just reads cached values.
@@ -394,6 +420,12 @@ class MainScreenState extends State<MainScreen> {
                       showInstalledApps: _showInstalledApps,
                       onToggleInstalledApps: (v) => setState(() {
                         _showInstalledApps = v;
+                      }),
+                      favoritesOnly: _favoritesOnly,
+                      onFavoritesOnlyChanged: (v) => setState(() {
+                        _favoritesOnly = v;
+                        _refilter();
+                        _savePreferences();
                       }),
                     ),
                     Expanded(
@@ -654,8 +686,8 @@ class MainScreenState extends State<MainScreen> {
               ListTile(
                 leading: const Icon(Icons.new_releases_outlined),
                 title: const Text('Updated Recently'),
-                subtitle: const Text(
-                  'Show only apps updated in the last 7 days',
+                subtitle: Text(
+                  'Show only apps updated in the last $_updatedRecentlyDays day${_updatedRecentlyDays == 1 ? '' : 's'}',
                 ),
                 trailing: Switch(
                   value: _updatedRecentlyFilter,
@@ -664,6 +696,37 @@ class MainScreenState extends State<MainScreen> {
                     _refilter();
                     _savePreferences();
                   }),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Slider(
+                        value: _updatedRecentlyDays.toDouble(),
+                        min: 1,
+                        max: 90,
+                        divisions: 89,
+                        label: '$_updatedRecentlyDays d',
+                        onChanged: (v) => setState(() {
+                          _updatedRecentlyDays = v.round();
+                          _refilter();
+                          _savePreferences();
+                        }),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 36,
+                      child: Text(
+                        '$_updatedRecentlyDays d',
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               // ── Reload Database ────────────────────────────────────────────
@@ -752,6 +815,21 @@ class MainScreenState extends State<MainScreen> {
                     MaterialPageRoute(
                       builder: (_) => const InstalledAppsScreen(),
                     ),
+                  );
+                },
+              ),
+              // ── App Updater ────────────────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.system_update_alt_outlined),
+                title: const Text('App Updater'),
+                subtitle: const Text(
+                  'Browse & install app versions from Drive',
+                ),
+                onTap: () {
+                  _scaffoldKey.currentState?.closeEndDrawer();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AppUpdaterScreen()),
                   );
                 },
               ),
