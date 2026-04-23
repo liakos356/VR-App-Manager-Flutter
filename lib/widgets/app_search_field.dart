@@ -4,7 +4,7 @@ import '../utils/localization.dart';
 
 /// Search bar with autocomplete suggestions drawn from app names, categories,
 /// and tags, plus a recent-search history panel.
-class AppSearchField extends StatelessWidget {
+class AppSearchField extends StatefulWidget {
   final List<dynamic> apps;
   final List<String> searchHistory;
   final SearchController controller;
@@ -21,14 +21,54 @@ class AppSearchField extends StatelessWidget {
   });
 
   @override
+  State<AppSearchField> createState() => _AppSearchFieldState();
+}
+
+class _AppSearchFieldState extends State<AppSearchField> {
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(AppSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    final hasText = widget.controller.text.isNotEmpty;
+    if (hasText != _hasText) {
+      setState(() => _hasText = hasText);
+    }
+  }
+
+  void _clearSearch() {
+    widget.controller.clear();
+    widget.controller.closeView('');
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SearchAnchor(
       isFullScreen: false,
-      searchController: controller,
+      searchController: widget.controller,
       viewConstraints: const BoxConstraints(maxHeight: 300),
       viewOnSubmitted: (value) {
-        onSaveHistory(value);
-        controller.closeView(value);
+        widget.onSaveHistory(value);
+        widget.controller.closeView(value);
       },
       builder: (BuildContext context, SearchController ctl) {
         return Material(
@@ -39,12 +79,19 @@ class AppSearchField extends StatelessWidget {
             onTap: () => ctl.openView(),
             onChanged: (_) => ctl.openView(),
             onSubmitted: (value) {
-              onSaveHistory(value);
+              widget.onSaveHistory(value);
               ctl.closeView(value);
             },
             decoration: InputDecoration(
               hintText: 'Search apps...',
               prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _hasText
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: _clearSearch,
+                      tooltip: 'Clear search',
+                    )
+                  : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
@@ -68,13 +115,13 @@ class AppSearchField extends StatelessWidget {
   }
 
   Iterable<Widget> _buildHistoryItems(SearchController ctl) {
-    final List<Widget> items = searchHistory.map((String item) {
+    final List<Widget> items = widget.searchHistory.map((String item) {
       return ListTile(
         leading: const Icon(Icons.history),
         title: Text(item),
         onTap: () {
           ctl.closeView(item);
-          onSaveHistory(item);
+          widget.onSaveHistory(item);
         },
       );
     }).toList();
@@ -88,7 +135,7 @@ class AppSearchField extends StatelessWidget {
             style: const TextStyle(color: Colors.red),
           ),
           onTap: () {
-            onClearHistory();
+            widget.onClearHistory();
             ctl.closeView('');
             Future.delayed(
               const Duration(milliseconds: 50),
@@ -104,7 +151,7 @@ class AppSearchField extends StatelessWidget {
   Iterable<Widget> _buildSuggestions(String query, SearchController ctl) {
     final Set<String> suggestions = {};
 
-    for (final app in apps) {
+    for (final app in widget.apps) {
       final name = (app['name'] ?? app['title'] ?? '').toString();
       if (name.toLowerCase().contains(query)) {
         suggestions.add(name);
@@ -133,7 +180,7 @@ class AppSearchField extends StatelessWidget {
         title: Text(suggestion),
         onTap: () {
           ctl.closeView(suggestion);
-          onSaveHistory(suggestion);
+          widget.onSaveHistory(suggestion);
         },
       );
     });

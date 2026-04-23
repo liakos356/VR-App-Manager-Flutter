@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/favorites_service.dart';
 import '../utils/installed_apps_cache.dart';
 
-enum AppViewMode { list, grid }
+enum AppViewMode { list, grid, iconOnly, detailList }
 
 enum AppSortOption { installTime, name, packageName }
 
@@ -47,11 +48,52 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   AppSortOption _sortOption = AppSortOption.installTime;
   AppSortDirection _sortDirection = AppSortDirection.desc;
 
+  // Cached SharedPreferences instance
+  SharedPreferences? _prefs;
+
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      _prefs = prefs;
+      _loadInstalledAppsPrefs(prefs);
+    });
     _loadInstalledApps();
     _loadFavorites();
+  }
+
+  void _loadInstalledAppsPrefs(SharedPreferences prefs) {
+    if (!mounted) return;
+    setState(() {
+      _baseSize = prefs.getDouble('ia_baseSize') ?? 60.0;
+      final viewModeStr = prefs.getString('ia_viewMode') ?? 'grid';
+      _viewMode = AppViewMode.values.firstWhere(
+        (e) => e.name == viewModeStr,
+        orElse: () => AppViewMode.grid,
+      );
+      final sortOptionStr = prefs.getString('ia_sortOption') ?? 'installTime';
+      _sortOption = AppSortOption.values.firstWhere(
+        (e) => e.name == sortOptionStr,
+        orElse: () => AppSortOption.installTime,
+      );
+      final sortDirStr = prefs.getString('ia_sortDirection') ?? 'desc';
+      _sortDirection = sortDirStr == 'asc'
+          ? AppSortDirection.asc
+          : AppSortDirection.desc;
+      _showFavoritesOnly = prefs.getBool('ia_showFavoritesOnly') ?? false;
+    });
+  }
+
+  Future<void> _saveInstalledAppsPrefs() async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    await prefs.setDouble('ia_baseSize', _baseSize);
+    await prefs.setString('ia_viewMode', _viewMode.name);
+    await prefs.setString('ia_sortOption', _sortOption.name);
+    await prefs.setString(
+      'ia_sortDirection',
+      _sortDirection == AppSortDirection.asc ? 'asc' : 'desc',
+    );
+    await prefs.setBool('ia_showFavoritesOnly', _showFavoritesOnly);
   }
 
   @override
@@ -258,6 +300,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                             setModalState(() {
                               _baseSize = val;
                             });
+                            _saveInstalledAppsPrefs();
                           },
                         ),
                       ),
@@ -340,11 +383,26 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                       child: Icon(Icons.list),
                     ),
                   ),
+                  ButtonSegment(
+                    value: AppViewMode.iconOnly,
+                    icon: Tooltip(
+                      message: 'Icon-Only View',
+                      child: Icon(Icons.apps),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: AppViewMode.detailList,
+                    icon: Tooltip(
+                      message: 'Detailed List',
+                      child: Icon(Icons.view_agenda),
+                    ),
+                  ),
                 ],
                 selected: <AppViewMode>{_viewMode},
                 showSelectedIcon: false,
                 onSelectionChanged: (Set<AppViewMode> newSelection) {
                   setState(() => _viewMode = newSelection.first);
+                  _saveInstalledAppsPrefs();
                 },
               ),
               const SizedBox(width: 16),
@@ -366,7 +424,10 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                   ),
                 ],
                 onChanged: (val) {
-                  if (val != null) setState(() => _sortOption = val);
+                  if (val != null) {
+                    setState(() => _sortOption = val);
+                    _saveInstalledAppsPrefs();
+                  }
                 },
               ),
               IconButton(
@@ -382,6 +443,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                         ? AppSortDirection.desc
                         : AppSortDirection.asc;
                   });
+                  _saveInstalledAppsPrefs();
                 },
               ),
               const SizedBox(width: 16),
@@ -392,8 +454,10 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     _showFavoritesOnly ? Icons.star : Icons.star_border,
                     color: _showFavoritesOnly ? Colors.amber : null,
                   ),
-                  onPressed: () =>
-                      setState(() => _showFavoritesOnly = !_showFavoritesOnly),
+                  onPressed: () {
+                    setState(() => _showFavoritesOnly = !_showFavoritesOnly);
+                    _saveInstalledAppsPrefs();
+                  },
                   tooltip: _showFavoritesOnly
                       ? 'Show All Apps'
                       : 'Show Favorites Only',
@@ -548,9 +612,327 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
               ? const Center(child: Text('No user-installed apps found.'))
               : _viewMode == AppViewMode.list
               ? _buildListView(appsToDisplay)
+              : _viewMode == AppViewMode.iconOnly
+              ? _buildIconOnlyView(appsToDisplay)
+              : _viewMode == AppViewMode.detailList
+              ? _buildDetailsListView(appsToDisplay)
               : _buildGridView(appsToDisplay),
         ),
       ],
+    );
+  }
+
+  Widget _buildIconOnlyView(List<AppInfo> apps) {
+    final iconSize = _baseSize.clamp(32.0, 80.0);
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: iconSize + 16,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: apps.length,
+      itemBuilder: (context, index) {
+        final app = apps[index];
+        final isSelected = _selectedPackages.contains(app.packageName);
+        final isNew = _isNewApp(app);
+        return Tooltip(
+          message: app.name,
+          child: GestureDetector(
+            onTap: _isSelectionMode
+                ? () => _toggleSelection(app.packageName)
+                : () => InstalledApps.startApp(app.packageName),
+            onLongPress: () {
+              if (!_isSelectionMode) {
+                setState(() {
+                  _isSelectionMode = true;
+                  _selectedPackages.add(app.packageName);
+                });
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: isSelected
+                    ? Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      )
+                    : null,
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: app.icon != null
+                        ? Image.memory(app.icon!, fit: BoxFit.contain)
+                        : const Icon(Icons.android),
+                  ),
+                  if (isNew && !_isSelectionMode)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 7,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!_isSelectionMode)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () => _toggleFavorite(app.packageName),
+                        child: Icon(
+                          _favoritePackages.contains(app.packageName)
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: _favoritePackages.contains(app.packageName)
+                              ? Colors.amber
+                              : Colors.white70,
+                          size: 14,
+                          shadows: const [
+                            Shadow(color: Colors.black54, blurRadius: 4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_isSelectionMode)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (val) => _toggleSelection(app.packageName),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailsListView(List<AppInfo> apps) {
+    return ListView.builder(
+      itemCount: apps.length,
+      itemBuilder: (context, index) {
+        final app = apps[index];
+        final isSelected = _selectedPackages.contains(app.packageName);
+        final isNew = _isNewApp(app);
+        final installDate = app.installedTimestamp != 0
+            ? DateTime.fromMillisecondsSinceEpoch(app.installedTimestamp)
+            : null;
+        final installDateStr = installDate != null
+            ? '${installDate.year}-${installDate.month.toString().padLeft(2, '0')}-${installDate.day.toString().padLeft(2, '0')}'
+            : 'Unknown';
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          color: isSelected
+              ? Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.5)
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: isSelected
+                ? BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  )
+                : BorderSide.none,
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _isSelectionMode
+                ? () => _toggleSelection(app.packageName)
+                : () => InstalledApps.startApp(app.packageName),
+            onLongPress: () {
+              if (!_isSelectionMode) {
+                setState(() {
+                  _isSelectionMode = true;
+                  _selectedPackages.add(app.packageName);
+                });
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: _baseSize,
+                    height: _baseSize,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: app.icon != null
+                              ? Image.memory(app.icon!, fit: BoxFit.contain)
+                              : const Icon(Icons.android),
+                        ),
+                        if (isNew && !_isSelectionMode)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: const Text(
+                                'NEW',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                app.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          app.packageName,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.label_outline,
+                              size: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'v${app.versionName} (${app.versionCode})',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              size: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              installDateStr,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!_isSelectionMode) ...[
+                    GestureDetector(
+                      onTap: () => _toggleFavorite(app.packageName),
+                      child: Icon(
+                        _favoritePackages.contains(app.packageName)
+                            ? Icons.star
+                            : Icons.star_border,
+                        color: _favoritePackages.contains(app.packageName)
+                            ? Colors.amber
+                            : null,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'launch') {
+                          InstalledApps.startApp(app.packageName);
+                        }
+                        if (value == 'uninstall') _showUninstallDialog(app);
+                        if (value == 'details') _showDetailsDialog(app);
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'launch',
+                          child: Text('Launch'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'details',
+                          child: Text('More Details'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'uninstall',
+                          child: Text(
+                            'Uninstall',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (val) => _toggleSelection(app.packageName),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

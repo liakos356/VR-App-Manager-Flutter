@@ -3,7 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'installed_apps_cache.dart';
 
 /// Result of checking whether an app is currently installed on the device.
-typedef InstallCheckResult = ({bool isInstalled, String packageName});
+typedef InstallCheckResult = ({
+  bool isInstalled,
+  String packageName,
+  String installedVersion,
+});
 
 /// Returns an [InstallCheckResult] for [app] by querying the device's
 /// installed-apps list using multiple matching strategies:
@@ -47,11 +51,15 @@ Future<InstallCheckResult> checkAppInstalled(dynamic app) async {
           dbPackage.contains(pkgName) ||
           a.name.toLowerCase().contains(title) ||
           fuzzyMatch) {
-        return (isInstalled: true, packageName: a.packageName.trim());
+        return (
+          isInstalled: true,
+          packageName: a.packageName.trim(),
+          installedVersion: a.versionName.trim(),
+        );
       }
     }
   } catch (e) {
     debugPrint('[installChecker] $e');
   }
-  return (isInstalled: false, packageName: '');
+  return (isInstalled: false, packageName: '', installedVersion: '');
 }

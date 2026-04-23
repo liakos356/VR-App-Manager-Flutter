@@ -215,5 +215,10 @@ int _compare(dynamic a, dynamic b, String sortOption) {
   }
 }
 
-String _name(dynamic app) =>
-    (app['name'] ?? app['title'] ?? '').toString().toLowerCase();
+String _name(dynamic app) {
+  var name = (app['name'] ?? app['title'] ?? '').toString().toLowerCase();
+  if (name.startsWith('the ') && name.length > 4) {
+    name = name.substring(4).trimLeft();
+  }
+  return name;
+}

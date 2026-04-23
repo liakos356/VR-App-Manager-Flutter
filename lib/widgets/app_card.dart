@@ -4,6 +4,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../services/google_drive_service.dart';
 import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
@@ -34,12 +35,15 @@ class AppCard extends StatefulWidget {
   State<AppCard> createState() => AppCardState();
 }
 
-class AppCardState extends State<AppCard> {
+class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   bool _isHovered = false;
   int _currentImageIndex = 0;
   bool _isInstalled = false;
   String _installedPackageName = '';
+  String _installedVersion = '';
   late List<String> _cachedImages;
+  late final AnimationController _flashController;
+  late final Animation<double> _flashAnimation;
 
   @override
   void initState() {
@@ -47,6 +51,13 @@ class AppCardState extends State<AppCard> {
     _cachedImages = _computeImages();
     _refreshInstallState();
     StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+    _flashAnimation = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _flashController, curve: Curves.easeInOut),
+    );
   }
 
   void _onFavoritesChanged() {
@@ -63,6 +74,7 @@ class AppCardState extends State<AppCard> {
 
   @override
   void dispose() {
+    _flashController.dispose();
     StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     // Do NOT evict images from CachedNetworkImage's disk/memory cache here.
     // Evicting on dispose defeats the purpose of caching: images would need
@@ -78,6 +90,7 @@ class AppCardState extends State<AppCard> {
       setState(() {
         _isInstalled = result.isInstalled;
         _installedPackageName = result.packageName;
+        _installedVersion = result.installedVersion;
       });
     }
   }
@@ -147,6 +160,15 @@ class AppCardState extends State<AppCard> {
 
     final apkPath = widget.app['apk_path']?.toString().trim();
     final isUnavailable = apkPath == null || apkPath.isEmpty;
+
+    final dbVersion = widget.app['version']?.toString().trim() ?? '';
+    final hasDriveUpdate =
+        apkPath != null &&
+        GoogleDriveService.isDrivePath(apkPath) &&
+        _isInstalled &&
+        dbVersion.isNotEmpty &&
+        _installedVersion.isNotEmpty &&
+        _installedVersion != dbVersion;
 
     final oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
     final createdAt = DateTime.tryParse(
@@ -262,6 +284,55 @@ class AppCardState extends State<AppCard> {
                                     color: Colors.white,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // ── Drive update chip ───────────────────────────
+                          if (hasDriveUpdate)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => showInstallBottomSheet(
+                                  context,
+                                  app: widget.app,
+                                  isInstalled: _isInstalled,
+                                  installedPackageName: _installedPackageName,
+                                  onInstallDone: _refreshInstallState,
+                                ),
+                                child: AnimatedBuilder(
+                                  animation: _flashAnimation,
+                                  builder: (context, child) => Opacity(
+                                    opacity: _flashAnimation.value,
+                                    child: child,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Colors.red,
+                                          blurRadius: 6,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Text(
+                                      'NEW',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),

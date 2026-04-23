@@ -9,12 +9,14 @@ import '../services/store_favorites_service.dart';
 import '../utils/app_filter.dart' as filter;
 import '../utils/localization.dart';
 import '../widgets/adjustable_split_view.dart';
+import '../widgets/alpha_index_column.dart';
 import '../widgets/app_card.dart';
 import '../widgets/app_detail_panel.dart';
 import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/genre_side_panel.dart';
 import '../widgets/main_filter_bar.dart';
+import '../widgets/settings_side_panel.dart';
 import 'app_updater_screen.dart';
 import 'installed_apps_screen.dart';
 
@@ -30,7 +32,8 @@ class MainScreen extends StatefulWidget {
 }
 
 class MainScreenState extends State<MainScreen> {
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  // Settings side-panel open/close state
+  bool _settingsPanelOpen = false;
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +72,11 @@ class MainScreenState extends State<MainScreen> {
   int _selectedMasterDetailIndex = 0;
   late final ValueNotifier<double> _cardSizeNotifier;
 
+  // ── Alphabet index ────────────────────────────────────────────────────────
+
+  final GlobalKey<_AppGridState> _appGridKey = GlobalKey<_AppGridState>();
+  late final ScrollController _masterDetailScrollController;
+
   // ── Screen Mode ───────────────────────────────────────────────────────────
   bool _showInstalledApps = false;
   int _installedAppsCount = 0;
@@ -90,6 +98,7 @@ class MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _cardSizeNotifier = ValueNotifier<double>(1.0);
+    _masterDetailScrollController = ScrollController();
     // Obtain SharedPreferences once; load prefs + history when ready.
     SharedPreferences.getInstance().then((prefs) {
       _prefs = prefs;
@@ -125,6 +134,7 @@ class MainScreenState extends State<MainScreen> {
     _searchDebounce?.cancel();
     _searchController.dispose();
     _cardSizeNotifier.dispose();
+    _masterDetailScrollController.dispose();
     StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     super.dispose();
   }
@@ -147,6 +157,7 @@ class MainScreenState extends State<MainScreen> {
       _typeFilter = prefs.getString('typeFilter') ?? 'all';
       _viewMode = prefs.getString('viewMode') ?? 'grid';
       _genreSidebarOpen = prefs.getBool('genreSidebarOpen') ?? true;
+      _settingsPanelOpen = prefs.getBool('settingsPanelOpen') ?? false;
       _cardSizeNotifier.value = prefs.getDouble('cardSize') ?? 1.0;
       _favoritesOnly = prefs.getBool('favoritesOnly') ?? false;
       _refilter();
@@ -166,6 +177,7 @@ class MainScreenState extends State<MainScreen> {
       await prefs.setString('typeFilter', _typeFilter);
       await prefs.setString('viewMode', _viewMode);
       await prefs.setBool('genreSidebarOpen', _genreSidebarOpen);
+      await prefs.setBool('settingsPanelOpen', _settingsPanelOpen);
       await prefs.setDouble('cardSize', _cardSizeNotifier.value);
       await prefs.setBool('favoritesOnly', _favoritesOnly);
     });
@@ -285,11 +297,11 @@ class MainScreenState extends State<MainScreen> {
       favoriteIds: StoreFavoritesNotifier.instance.value,
     );
 
-    // Compute genre metadata once here so build() just reads cached values.
-    _cachedAvailableGenresList = filter.availableGenres(
-      _cachedPreGenreFilteredApps,
-    );
-    _cachedGenreCounts = filter.genreCountsMap(_cachedPreGenreFilteredApps);
+    // Compute genre metadata from ALL loaded apps (unfiltered) so counts
+    // reflect totals regardless of active filters.
+    _cachedAvailableGenresList = filter.availableGenres(_apps);
+    _cachedGenreCounts = Map.of(filter.genreCountsMap(_apps))
+      ..['all genres'] = _totalCount > 0 ? _totalCount : _apps.length;
 
     // If the selected genre is no longer present, reset to avoid empty list.
     if (_genreFilter != 'All Genres' &&
@@ -313,8 +325,6 @@ class MainScreenState extends State<MainScreen> {
       valueListenable: isGreekNotifier,
       builder: (context, isGreek, _) {
         return Scaffold(
-          key: _scaffoldKey,
-          endDrawer: _buildSettingsDrawer(context),
           appBar: AppBar(
             title: Row(
               children: [
@@ -365,519 +375,234 @@ class MainScreenState extends State<MainScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.tune),
-                onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-                tooltip: 'Settings',
+                icon: Icon(
+                  _settingsPanelOpen ? Icons.tune : Icons.tune,
+                ),
+                onPressed: () => setState(() {
+                  _settingsPanelOpen = !_settingsPanelOpen;
+                  _savePreferences();
+                }),
+                tooltip: _settingsPanelOpen ? 'Close Settings' : 'Settings',
               ),
               const SizedBox(width: 8),
             ],
           ),
           // body contents
-          body: _showInstalledApps
-              ? InstalledAppsScreen(
-                  searchQuery: _searchQuery,
-                  onToggleInstalledApps: (v) =>
-                      setState(() => _showInstalledApps = v),
-                  onAppCountChanged: (count) {
-                    if (_installedAppsCount != count) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() => _installedAppsCount = count);
-                        }
-                      });
-                    }
-                  },
-                )
-              : Column(
-                  children: [
-                    MainFilterBar(
-                      viewMode: _viewMode,
-                      sortOption: _sortOption,
-                      genreSidebarOpen: _genreSidebarOpen,
-                      genreFilter: _genreFilter,
-                      onGenreToggle: () => setState(() {
-                        _genreSidebarOpen = !_genreSidebarOpen;
-                        _savePreferences();
-                      }),
-                      onClearGenre: () => setState(() {
-                        _genreFilter = 'All Genres';
-                        _refilter();
-                        _savePreferences();
-                      }),
-                      onViewModeChanged: (v) => setState(() {
-                        _viewMode = v;
-                        _savePreferences();
-                      }),
-                      onSortChanged: (v) {
-                        if (v != null) {
-                          setState(() {
-                            _sortOption = v;
-                            _refilter();
-                            _savePreferences();
-                          });
-                        }
-                      },
-                      showInstalledApps: _showInstalledApps,
-                      onToggleInstalledApps: (v) => setState(() {
-                        _showInstalledApps = v;
-                      }),
-                      favoritesOnly: _favoritesOnly,
-                      onFavoritesOnlyChanged: (v) => setState(() {
-                        _favoritesOnly = v;
-                        _refilter();
-                        _savePreferences();
-                      }),
-                    ),
-                    Expanded(
-                      child: Row(
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: _showInstalledApps
+                    ? InstalledAppsScreen(
+                        searchQuery: _searchQuery,
+                        onToggleInstalledApps: (v) =>
+                            setState(() => _showInstalledApps = v),
+                        onAppCountChanged: (count) {
+                          if (_installedAppsCount != count) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                setState(() => _installedAppsCount = count);
+                              }
+                            });
+                          }
+                        },
+                      )
+                    : Column(
                         children: [
-                          GenreSidePanel(
-                            genres: _availableGenres,
-                            selected: _genreFilter,
-                            getGenreCount: _getGenreCount,
-                            onChanged: (v) => setState(() {
-                              _genreFilter = v;
+                          MainFilterBar(
+                            viewMode: _viewMode,
+                            sortOption: _sortOption,
+                            genreSidebarOpen: _genreSidebarOpen,
+                            genreFilter: _genreFilter,
+                            onGenreToggle: () => setState(() {
+                              _genreSidebarOpen = !_genreSidebarOpen;
+                              _savePreferences();
+                            }),
+                            onClearGenre: () => setState(() {
+                              _genreFilter = 'All Genres';
                               _refilter();
                               _savePreferences();
                             }),
-                            isOpen: _genreSidebarOpen,
-                            onToggle: () => setState(() {
-                              _genreSidebarOpen = !_genreSidebarOpen;
+                            onViewModeChanged: (v) => setState(() {
+                              _viewMode = v;
+                              _savePreferences();
+                            }),
+                            onSortChanged: (v) {
+                              if (v != null) {
+                                setState(() {
+                                  _sortOption = v;
+                                  _refilter();
+                                  _savePreferences();
+                                });
+                              }
+                            },
+                            showInstalledApps: _showInstalledApps,
+                            onToggleInstalledApps: (v) => setState(() {
+                              _showInstalledApps = v;
+                            }),
+                            favoritesOnly: _favoritesOnly,
+                            onFavoritesOnlyChanged: (v) => setState(() {
+                              _favoritesOnly = v;
+                              _refilter();
                               _savePreferences();
                             }),
                           ),
                           Expanded(
-                            child: _isLoading
-                                ? _LoadingBody(
-                                    downloadProgress: _downloadProgress,
-                                  )
-                                : _fetchError != null
-                                ? _ErrorBody(
-                                    message: _fetchError!,
-                                    onRetry: () =>
-                                        _fetchApps(forceRefresh: true),
-                                  )
-                                : ValueListenableBuilder<double>(
-                                    valueListenable: _cardSizeNotifier,
-                                    builder: (context, cardSize, _) {
-                                      return LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          if (_viewMode == 'master_detail') {
-                                            return _buildMasterDetailView(
-                                              displayedApps,
-                                            );
-                                          }
-                                          return _AppGrid(
-                                            apps: displayedApps,
-                                            apiUrl: _kApiUrl,
-                                            constraints: constraints,
-                                            cardSizeMultiplier: cardSize,
-                                            onLoadMore: _hasMore
-                                                ? _loadMoreApps
-                                                : null,
-                                            isLoadingMore: _isLoadingMore,
-                                            hasMore: _hasMore,
-                                            onRefresh: () => _fetchApps(
-                                              forceRefresh: true,
-                                              silent: true,
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
+                            child: Row(
+                              children: [
+                                AlphaIndexColumn(
+                                  apps: _apps,
+                                  onLetterTap: (letter) =>
+                                      _onAlphaLetterTap(letter, displayedApps),
+                                ),
+                                if (_genreSidebarOpen)
+                                  GenreSidePanel(
+                                    genres: _availableGenres,
+                                    selected: _genreFilter,
+                                    getGenreCount: _getGenreCount,
+                                    onChanged: (v) => setState(() {
+                                      _genreFilter = v;
+                                      _refilter();
+                                      _savePreferences();
+                                    }),
+                                    isOpen: _genreSidebarOpen,
+                                    onToggle: () => setState(() {
+                                      _genreSidebarOpen = !_genreSidebarOpen;
+                                      _savePreferences();
+                                    }),
                                   ),
+                                Expanded(
+                                  child: _isLoading
+                                      ? _LoadingBody(
+                                          downloadProgress: _downloadProgress,
+                                        )
+                                      : _fetchError != null
+                                      ? _ErrorBody(
+                                          message: _fetchError!,
+                                          onRetry: () =>
+                                              _fetchApps(forceRefresh: true),
+                                        )
+                                      : ValueListenableBuilder<double>(
+                                          valueListenable: _cardSizeNotifier,
+                                          builder: (context, cardSize, _) {
+                                            return LayoutBuilder(
+                                              builder: (
+                                                context,
+                                                constraints,
+                                              ) {
+                                                if (_viewMode ==
+                                                    'master_detail') {
+                                                  return _buildMasterDetailView(
+                                                    displayedApps,
+                                                  );
+                                                }
+                                                return _AppGrid(
+                                                  key: _appGridKey,
+                                                  apps: displayedApps,
+                                                  apiUrl: _kApiUrl,
+                                                  constraints: constraints,
+                                                  cardSizeMultiplier: cardSize,
+                                                  cardSizeNotifier:
+                                                      _cardSizeNotifier,
+                                                  onLoadMore: _hasMore
+                                                      ? _loadMoreApps
+                                                      : null,
+                                                  isLoadingMore: _isLoadingMore,
+                                                  hasMore: _hasMore,
+                                                  onRefresh: () => _fetchApps(
+                                                    forceRefresh: true,
+                                                    silent: true,
+                                                  ),
+                                                  onSwitchToMasterDetail: () =>
+                                                      setState(() {
+                                                        _viewMode =
+                                                            'master_detail';
+                                                        _cardSizeNotifier
+                                                            .value = 1.0;
+                                                        _savePreferences();
+                                                      }),
+                                                );
+                                              },
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+              ),
+              // ── Dismiss overlay when settings panel is open ─────────────
+              if (_settingsPanelOpen)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() {
+                      _settingsPanelOpen = false;
+                      _savePreferences();
+                    }),
+                    child: const ColoredBox(color: Colors.transparent),
+                  ),
                 ),
-        );
-      },
-    );
-  }
-
-  Drawer _buildSettingsDrawer(BuildContext context) {
-    return Drawer(
-      width: 340,
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
-                child: Text(
-                  'Settings',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Divider(),
-              // ── Language ──────────────────────────────────────────────────
-              ValueListenableBuilder<bool>(
-                valueListenable: isGreekNotifier,
-                builder: (context, isGreek, _) {
-                  return ListTile(
-                    leading: const Icon(Icons.language),
-                    title: const Text('Language'),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isGreek ? 'GR' : 'EN',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    onTap: () async {
-                      isGreekNotifier.value = !isGreekNotifier.value;
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool('isGreek', isGreekNotifier.value);
-                    },
-                  );
-                },
-              ),
-              // ── Theme ─────────────────────────────────────────────────────
-              ValueListenableBuilder<ThemeMode>(
-                valueListenable: themeNotifier,
-                builder: (context, mode, _) {
-                  final dark = mode == ThemeMode.dark;
-                  return ListTile(
-                    leading: Icon(dark ? Icons.light_mode : Icons.dark_mode),
-                    title: const Text('Theme'),
-                    trailing: Text(
-                      dark ? 'Dark' : 'Light',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    onTap: () => themeNotifier.value = dark
-                        ? ThemeMode.light
-                        : ThemeMode.dark,
-                  );
-                },
-              ),
-              // ── Accent Color ───────────────────────────────────────────────
-              ValueListenableBuilder<int>(
-                valueListenable: accentIndexNotifier,
-                builder: (context, accentIdx, _) {
-                  final isDark =
-                      Theme.of(context).brightness == Brightness.dark;
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.palette_outlined,
-                              color: Theme.of(context).iconTheme.color,
-                            ),
-                            const SizedBox(width: 16),
-                            const Text(
-                              'Accent Color',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: List.generate(accentColorOptions.length, (
-                            i,
-                          ) {
-                            final opt = accentColorOptions[i];
-                            final color = isDark
-                                ? opt.darkColor
-                                : opt.lightColor;
-                            final selected = i == accentIdx;
-                            return Tooltip(
-                              message: opt.name,
-                              child: GestureDetector(
-                                onTap: () async {
-                                  accentIndexNotifier.value = i;
-                                  final prefs =
-                                      await SharedPreferences.getInstance();
-                                  await prefs.setInt('accentColorIndex', i);
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: selected
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface
-                                          : Colors.transparent,
-                                      width: 2.5,
-                                    ),
-                                    boxShadow: selected
-                                        ? [
-                                            BoxShadow(
-                                              color: color.withValues(
-                                                alpha: 0.55,
-                                              ),
-                                              blurRadius: 6,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: selected
-                                      ? const Icon(
-                                          Icons.check,
-                                          size: 16,
-                                          color: Colors.white,
-                                        )
-                                      : null,
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              // ── Ovrport Only ───────────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.vrpano_outlined),
-                title: const Text('Ovrport Only'),
-                subtitle: const Text('Show only Ovrport-compatible apps'),
-                trailing: Switch(
-                  value: _ovrportFilter,
-                  onChanged: (v) => setState(() {
+              // ── Settings side panel overlay ─────────────────────────────
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 0,
+                child: SettingsSidePanel(
+                  isOpen: _settingsPanelOpen,
+                  onToggle: () => setState(() {
+                    _settingsPanelOpen = !_settingsPanelOpen;
+                    _savePreferences();
+                  }),
+                  ovrportFilter: _ovrportFilter,
+                  onOvrportFilterChanged: (v) => setState(() {
                     _ovrportFilter = v;
                     _refilter();
                     _savePreferences();
                   }),
-                ),
-              ),
-              // ── Available Only ─────────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.cloud_download_outlined),
-                title: const Text('Available Only'),
-                subtitle: const Text('Hide apps not on the server'),
-                trailing: Switch(
-                  value: _availableOnly,
-                  onChanged: (v) => setState(() {
+                  availableOnly: _availableOnly,
+                  onAvailableOnlyChanged: (v) => setState(() {
                     _availableOnly = v;
                     _refilter();
                     _savePreferences();
                   }),
-                ),
-              ),
-              // ── Updated Recently ───────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.new_releases_outlined),
-                title: const Text('Updated Recently'),
-                subtitle: Text(
-                  'Show only apps updated in the last $_updatedRecentlyDays day${_updatedRecentlyDays == 1 ? '' : 's'}',
-                ),
-                trailing: Switch(
-                  value: _updatedRecentlyFilter,
-                  onChanged: (v) => setState(() {
+                  updatedRecentlyFilter: _updatedRecentlyFilter,
+                  onUpdatedRecentlyFilterChanged: (v) => setState(() {
                     _updatedRecentlyFilter = v;
                     _refilter();
                     _savePreferences();
                   }),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Slider(
-                        value: _updatedRecentlyDays.toDouble(),
-                        min: 1,
-                        max: 90,
-                        divisions: 89,
-                        label: '$_updatedRecentlyDays d',
-                        onChanged: (v) => setState(() {
-                          _updatedRecentlyDays = v.round();
-                          _refilter();
-                          _savePreferences();
-                        }),
+                  updatedRecentlyDays: _updatedRecentlyDays,
+                  onUpdatedRecentlyDaysChanged: (v) => setState(() {
+                    _updatedRecentlyDays = v;
+                    _refilter();
+                    _savePreferences();
+                  }),
+                  onReloadDatabase: () => _fetchApps(forceRefresh: true),
+                  onOpenInstalledApps: () {
+                    setState(() {
+                      _settingsPanelOpen = false;
+                      _showInstalledApps = true;
+                    });
+                    _savePreferences();
+                  },
+                  onOpenAppUpdater: () {
+                    setState(() => _settingsPanelOpen = false);
+                    _savePreferences();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AppUpdaterScreen(),
                       ),
-                    ),
-                    SizedBox(
-                      width: 36,
-                      child: Text(
-                        '$_updatedRecentlyDays d',
-                        textAlign: TextAlign.end,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // ── Reload Database ────────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.sync),
-                title: const Text('Reload Database'),
-                onTap: () {
-                  _scaffoldKey.currentState?.closeEndDrawer();
-                  _fetchApps(forceRefresh: true);
-                },
-              ),
-              const Divider(),
-              // ── Card Size slider ───────────────────────────────────────────
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  children: [
-                    Icon(Icons.grid_view_rounded),
-                    SizedBox(width: 12),
-                    Text('Card Size', style: TextStyle(fontSize: 16)),
-                  ],
-                ),
-              ),
-              ValueListenableBuilder<double>(
-                valueListenable: _cardSizeNotifier,
-                builder: (context, cardSize, _) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.crop_square,
-                              size: 16,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.color
-                                  ?.withValues(alpha: 0.7),
-                            ),
-                            Expanded(
-                              child: Slider(
-                                value: cardSize,
-                                min: 0.5,
-                                max: 2.0,
-                                divisions: 6,
-                                label: '${cardSize.toStringAsFixed(1)}×',
-                                onChanged: (v) => _cardSizeNotifier.value = v,
-                              ),
-                            ),
-                            Icon(
-                              Icons.crop_square,
-                              size: 28,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.color
-                                  ?.withValues(alpha: 0.7),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${cardSize.toStringAsFixed(1)}× size',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodySmall?.color
-                                ?.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const Divider(),
-              // ── Installed Apps ─────────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.install_mobile),
-                title: const Text('Installed Apps'),
-                onTap: () {
-                  _scaffoldKey.currentState?.closeEndDrawer();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const InstalledAppsScreen(),
-                    ),
-                  );
-                },
-              ),
-              // ── App Updater ────────────────────────────────────────────────
-              ListTile(
-                leading: const Icon(Icons.system_update_alt_outlined),
-                title: const Text('App Updater'),
-                subtitle: const Text(
-                  'Browse & install app versions from Drive',
-                ),
-                onTap: () {
-                  _scaffoldKey.currentState?.closeEndDrawer();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AppUpdaterScreen()),
-                  );
-                },
-              ),
-              const Divider(),
-              // ── Google Drive Account ──────────────────────────────────────
-              ValueListenableBuilder<GoogleUserInfo?>(
-                valueListenable: GoogleDriveService().userNotifier,
-                builder: (ctx, user, _) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: user?.photoUrl != null
-                        ? NetworkImage(user!.photoUrl!)
-                        : null,
-                    child: user?.photoUrl == null
-                        ? const Icon(Icons.account_circle_outlined)
-                        : null,
-                  ),
-                  title: const Text('Google Drive'),
-                  subtitle: Text(
-                    user?.email ?? 'Not connected — tap to sign in',
-                  ),
-                  trailing: user != null
-                      ? TextButton(
-                          child: const Text('Sign out'),
-                          onPressed: () => GoogleDriveService().signOut(),
-                        )
-                      : const Icon(Icons.chevron_right),
-                  onTap: user == null
-                      ? () async {
-                          try {
-                            await GoogleDriveService().startOAuthFlow(ctx);
-                          } catch (e) {
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text('Google sign-in failed: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      : null,
+                    );
+                  },
                 ),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -895,6 +620,7 @@ class MainScreenState extends State<MainScreen> {
         onRefresh: () => _fetchApps(forceRefresh: true, silent: true),
         displacement: 60,
         child: ListView.separated(
+          controller: _masterDetailScrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           addAutomaticKeepAlives: false,
           padding: const EdgeInsets.all(16),
@@ -923,6 +649,32 @@ class MainScreenState extends State<MainScreen> {
       ),
       right: AppDetailPanel(app: selectedApp, apiUrl: _kApiUrl),
     );
+  }
+
+  // ── Alphabet index navigation ───────────────────────────────────────────────
+
+  void _onAlphaLetterTap(String letter, List<dynamic> apps) {
+    final index = findFirstIndexForLetter(apps, letter);
+    if (index < 0) return;
+
+    if (_viewMode == 'master_detail') {
+      if (!_masterDetailScrollController.hasClients) return;
+      // Approximate item height: ListTile with vertical padding 8 each side
+      // gives ~80px content height; separator is 8px.
+      const double itemHeight = 80.0;
+      const double separatorHeight = 8.0;
+      const double topPadding = 16.0;
+      final double offset =
+          topPadding + index * (itemHeight + separatorHeight);
+      _masterDetailScrollController.jumpTo(
+        offset.clamp(
+          _masterDetailScrollController.position.minScrollExtent,
+          _masterDetailScrollController.position.maxScrollExtent,
+        ),
+      );
+    } else {
+      _appGridKey.currentState?.jumpToIndex(index);
+    }
   }
 }
 
@@ -964,20 +716,25 @@ class _AppGrid extends StatefulWidget {
   final String apiUrl;
   final BoxConstraints constraints;
   final double cardSizeMultiplier;
+  final ValueNotifier<double> cardSizeNotifier;
   final VoidCallback? onLoadMore;
   final bool isLoadingMore;
   final bool hasMore;
   final Future<void> Function()? onRefresh;
+  final VoidCallback? onSwitchToMasterDetail;
 
   const _AppGrid({
+    super.key,
     required this.apps,
     required this.apiUrl,
     required this.constraints,
+    required this.cardSizeNotifier,
     this.cardSizeMultiplier = 1.0,
     this.onLoadMore,
     this.isLoadingMore = false,
     this.hasMore = false,
     this.onRefresh,
+    this.onSwitchToMasterDetail,
   });
 
   @override
@@ -988,6 +745,8 @@ class _AppGridState extends State<_AppGrid> {
   final ScrollController _scrollController = ScrollController();
   bool _showFab = false;
   bool _requestedMore = false;
+  bool _sliderVisible = true;
+  Timer? _scrollStopTimer;
 
   @override
   void initState() {
@@ -1005,6 +764,13 @@ class _AppGridState extends State<_AppGrid> {
         _requestedMore = true;
         widget.onLoadMore?.call();
       }
+
+      // Hide slider while scrolling; reappear after scrolling stops.
+      if (_sliderVisible) setState(() => _sliderVisible = false);
+      _scrollStopTimer?.cancel();
+      _scrollStopTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _sliderVisible = true);
+      });
     });
   }
 
@@ -1020,8 +786,37 @@ class _AppGridState extends State<_AppGrid> {
 
   @override
   void dispose() {
+    _scrollStopTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Instantly scrolls the grid so that the item at [index] is at the top.
+  void jumpToIndex(int index) {
+    if (!_scrollController.hasClients) return;
+    final w = widget.constraints.maxWidth;
+    final int baseCount = w > 1200 ? 5 : w > 800 ? 4 : 2;
+    final int crossAxisCount =
+        (baseCount / widget.cardSizeMultiplier).round().clamp(1, 10);
+
+    const double hPad = 24.0;
+    const double spacing = 24.0;
+    const double aspectRatio = 0.75;
+
+    final double usableWidth = w - 2 * hPad - (crossAxisCount - 1) * spacing;
+    final double itemWidth = usableWidth / crossAxisCount;
+    final double itemHeight = itemWidth / aspectRatio;
+    final double rowHeight = itemHeight + spacing;
+
+    final int rowIndex = index ~/ crossAxisCount;
+    final double offset = hPad + rowIndex * rowHeight;
+
+    _scrollController.jumpTo(
+      offset.clamp(
+        _scrollController.position.minScrollExtent,
+        _scrollController.position.maxScrollExtent,
+      ),
+    );
   }
 
   @override
@@ -1081,21 +876,99 @@ class _AppGridState extends State<_AppGrid> {
         Positioned(
           right: 24,
           bottom: 24,
-          child: AnimatedOpacity(
-            opacity: _showFab ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: IgnorePointer(
-              ignoring: !_showFab,
-              child: FloatingActionButton.small(
-                onPressed: () => _scrollController.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeInOut,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              AnimatedOpacity(
+                opacity: _sliderVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: !_sliderVisible,
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: widget.cardSizeNotifier,
+                    builder: (ctx, cardSize, _) => Container(
+                      width: 160,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx)
+                            .colorScheme
+                            .surface
+                            .withValues(alpha: 0.88),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: SliderTheme(
+                        data: SliderTheme.of(ctx).copyWith(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 12,
+                          ),
+                          activeTrackColor: Theme.of(ctx)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.7),
+                          inactiveTrackColor: Theme.of(ctx)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.18),
+                          thumbColor:
+                              Theme.of(ctx).colorScheme.primary,
+                        ),
+                        child: Slider(
+                          value: cardSize,
+                          min: 0.5,
+                          max: 2.0,
+                          divisions: 6,
+                          onChanged: (v) =>
+                              widget.cardSizeNotifier.value = v,
+                          onChangeEnd: (v) {
+                            if (v <= 0.5) {
+                              widget.onSwitchToMasterDetail?.call();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                tooltip: 'Scroll to top',
-                child: const Icon(Icons.keyboard_arrow_up),
               ),
-            ),
+              const SizedBox(width: 8),
+              AnimatedOpacity(
+                opacity: _showFab ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                child: IgnorePointer(
+                  ignoring: !_showFab,
+                  child: FloatingActionButton.small(
+                    onPressed: () => _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                    ),
+                    tooltip: 'Scroll to top',
+                    child: const Icon(Icons.keyboard_arrow_up),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

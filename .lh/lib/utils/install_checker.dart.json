@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776436707036,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776941922308,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,22 +1,27 @@\n import 'package:flutter/foundation.dart';\n-import 'package:installed_apps/installed_apps.dart';\n \n+import 'installed_apps_cache.dart';\n+\n /// Result of checking whether an app is currently installed on the device.\n-typedef InstallCheckResult = ({bool isInstalled, String packageName});\n+typedef InstallCheckResult = ({\n+  bool isInstalled,\n+  String packageName,\n+  String installedVersion,\n+});\n \n /// Returns an [InstallCheckResult] for [app] by querying the device's\n /// installed-apps list using multiple matching strategies:\n ///\n /// - Exact package-name match against `package_name` or `id` fields.\n /// - APK-path substring match.\n /// - Fuzzy title match (strips non-alpha chars then checks containment).\n+///\n+/// Uses [InstalledAppsCache] so all concurrent card-level checks share a\n+/// single IPC call rather than each firing their own.\n Future<InstallCheckResult> checkAppInstalled(dynamic app) async {\n   try {\n-    final installedList = await InstalledApps.getInstalledApps(\n-      excludeSystemApps: false,\n-      excludeNonLaunchableApps: false,\n-    );\n+    final installedList = await InstalledAppsCache.get();\n \n     final title = (app['title']?.toString() ?? '').toLowerCase();\n     final apkPath = (app['file_path_apk']?.toString() ?? '').toLowerCase();\n     final id = (app['id']?.toString() ?? '').toLowerCase();\n@@ -33,9 +38,10 @@\n           .replaceAll('net.', '')\n           .replaceAll('co.', '')\n           .replaceAll(nonAlpha, '');\n \n-      final fuzzyMatch = cleanTitle.isNotEmpty &&\n+      final fuzzyMatch =\n+          cleanTitle.isNotEmpty &&\n           cleanPkg.isNotEmpty &&\n           (cleanTitle.contains(cleanPkg) || cleanPkg.contains(cleanTitle));\n \n       if (apkPath.contains(pkgName) ||\n@@ -44,12 +50,16 @@\n           dbPackage == pkgName ||\n           dbPackage.contains(pkgName) ||\n           a.name.toLowerCase().contains(title) ||\n           fuzzyMatch) {\n-        return (isInstalled: true, packageName: a.packageName.trim());\n+        return (\n+          isInstalled: true,\n+          packageName: a.packageName.trim(),\n+          installedVersion: a.versionName.trim(),\n+        );\n       }\n     }\n   } catch (e) {\n     debugPrint('[installChecker] $e');\n   }\n-  return (isInstalled: false, packageName: '');\n+  return (isInstalled: false, packageName: '', installedVersion: '');\n }\n"
                 }
             ],
             "date": 1776436707036,

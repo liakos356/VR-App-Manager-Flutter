@@ -28,6 +28,12 @@ void main() async {
       0,
       accentColorOptions.length - 1,
     );
+    final themePref = prefs.getString('themeMode');
+    if (themePref == 'dark') {
+      themeNotifier.value = ThemeMode.dark;
+    } else if (themePref == 'light') {
+      themeNotifier.value = ThemeMode.light;
+    }
   });
 
   // Pre-warm the installed-apps cache now so that when the grid renders
