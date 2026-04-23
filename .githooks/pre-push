@@ -26,8 +26,11 @@ echo ""
 echo "==> Push to master detected. Running build_and_copy.sh..."
 echo ""
 
-# Redirect stdin from the terminal so the script's interactive prompts work.
-bash "$REPO_ROOT/scripts/build_and_copy.sh" < /dev/tty
+# Reassign stdin to the terminal so the build script's interactive prompts work.
+# Falls back silently if /dev/tty is unavailable (e.g. CI or GUI clients).
+exec < /dev/tty 2>/dev/null || true
+
+bash "$REPO_ROOT/scripts/build_and_copy.sh"
 EXIT_CODE=$?
 
 if [[ $EXIT_CODE -ne 0 ]]; then

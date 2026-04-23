@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776939192766,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1776939323661,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -25,10 +25,13 @@\n echo \"\"\n echo \"==> Push to master detected. Running build_and_copy.sh...\"\n echo \"\"\n \n-# Redirect stdin from the terminal so the script's interactive prompts work.\n-bash \"$REPO_ROOT/scripts/build_and_copy.sh\" < /dev/tty\n+# Reassign stdin to the terminal so the build script's interactive prompts work.\n+# Falls back silently if /dev/tty is unavailable (e.g. CI or GUI clients).\n+exec < /dev/tty 2>/dev/null || true\n+\n+bash \"$REPO_ROOT/scripts/build_and_copy.sh\"\n EXIT_CODE=$?\n \n if [[ $EXIT_CODE -ne 0 ]]; then\n     echo \"\"\n"
                 }
             ],
             "date": 1776939192766,
