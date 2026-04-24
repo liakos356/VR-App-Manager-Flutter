@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/services/download_service.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1777048018269,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1777048018269,
+            "name": "Commit-0",
+            "content": "import 'dart:convert';\n\nimport 'package:http/http.dart' as http;\n\nconst String kDownloadServerBaseUrl = 'http://100.95.32.89:8100/api';\n\n/// Singleton that communicates with the Telegram → Google Drive download server.\nclass DownloadService {\n  DownloadService._();\n  static final DownloadService _instance = DownloadService._();\n  factory DownloadService() => _instance;\n\n  // ── Helpers ───────────────────────────────────────────────────────────────\n\n  /// Throws a [DownloadServiceException] for non-2xx responses, extracting the\n  /// `detail` field from the JSON body when present.\n  void _checkResponse(http.Response res, String url) {\n    if (res.statusCode >= 200 && res.statusCode < 300) return;\n    String detail = 'HTTP ${res.statusCode} @ $url — body: ${res.body}';\n    try {\n      final body = jsonDecode(res.body);\n      if (body is Map && body['detail'] != null) {\n        detail = '${body['detail']} (HTTP ${res.statusCode} @ $url)';\n      }\n    } catch (_) {}\n    throw DownloadServiceException(detail);\n  }\n\n  // ── Public API ────────────────────────────────────────────────────────────\n\n  /// POST /downloads — enqueues a download job for [appId].\n  /// Returns the created job row as a Map.\n  Future<Map<String, dynamic>> enqueue(int appId) async {\n    final url = '$kDownloadServerBaseUrl/downloads';\n    final res = await http.post(\n      Uri.parse(url),\n      headers: {'Content-Type': 'application/json'},\n      body: jsonEncode({'app_id': appId}),\n    );\n    _checkResponse(res, url);\n    return (jsonDecode(res.body) as Map<String, dynamic>);\n  }\n\n  /// GET /downloads — returns all jobs (newest first), each with joined `apps`.\n  Future<List<Map<String, dynamic>>> listJobs() async {\n    final url = '$kDownloadServerBaseUrl/downloads';\n    final res = await http.get(Uri.parse(url));\n    _checkResponse(res, url);\n    final decoded = jsonDecode(res.body);\n    return (decoded as List).cast<Map<String, dynamic>>();\n  }\n\n  /// DELETE /downloads/{jobId} — cancels an active job or removes a finished one.\n  Future<void> cancelOrDelete(int jobId) async {\n    final url = '$kDownloadServerBaseUrl/downloads/$jobId';\n    final res = await http.delete(Uri.parse(url));\n    _checkResponse(res, url);\n  }\n\n  /// DELETE /downloads/history — bulk-deletes all finished jobs.\n  Future<void> clearHistory() async {\n    final url = '$kDownloadServerBaseUrl/downloads/history';\n    final res = await http.delete(Uri.parse(url));\n    _checkResponse(res, url);\n  }\n}\n\nclass DownloadServiceException implements Exception {\n  final String message;\n  const DownloadServiceException(this.message);\n\n  @override\n  String toString() => 'DownloadServiceException: $message';\n}\n"
+        }
+    ]
+}

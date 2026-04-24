@@ -1,0 +1,18 @@
+{
+    "sourceFile": "lib/services/download_jobs_notifier.dart",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1777048018269,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1777048018269,
+            "name": "Commit-0",
+            "content": "import 'dart:async';\n\nimport 'package:flutter/foundation.dart';\n\nimport 'download_service.dart';\n\n/// Singleton ChangeNotifier that polls the download server every 3 seconds\n/// and notifies listeners when the job list changes.\n///\n/// Lifecycle:\n///   - Call [startPolling] once (e.g. in MainScreen.initState).\n///   - Call [stopPolling] in MainScreen.dispose.\nclass DownloadJobsNotifier extends ChangeNotifier {\n  DownloadJobsNotifier._();\n  static final DownloadJobsNotifier instance = DownloadJobsNotifier._();\n\n  List<Map<String, dynamic>> jobs = [];\n  int activeCount = 0;\n\n  Timer? _timer;\n\n  // Tracks job IDs whose \"done\" transition has already been notified so we\n  // don't fire the \"App Ready\" snackbar more than once per job.\n  final Set<int> _notifiedDoneIds = {};\n\n  // Callback invoked when a job transitions to 'done'.  Assigned by the\n  // consumer (MainScreen) so it can show a SnackBar without a BuildContext\n  // dependency here.\n  void Function(Map<String, dynamic> job)? onJobDone;\n\n  // ── Polling control ────────────────────────────────────────────────────────\n\n  void startPolling() {\n    _timer?.cancel();\n    _poll(); // immediate first fetch\n    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _poll());\n  }\n\n  void stopPolling() {\n    _timer?.cancel();\n    _timer = null;\n  }\n\n  Future<void> _poll() async {\n    try {\n      final fetched = await DownloadService().listJobs();\n      _updateJobs(fetched);\n    } catch (_) {\n      // Silently ignore poll errors – the UI shows stale data until next poll.\n    }\n  }\n\n  void _updateJobs(List<Map<String, dynamic>> fetched) {\n    jobs = fetched;\n    activeCount = fetched\n        .where((j) => _isActive(j['status']?.toString()))\n        .length;\n\n    // Detect \"done\" transitions and fire the callback once per job.\n    for (final job in fetched) {\n      final status = job['status']?.toString();\n      final id = job['id'] as int?;\n      if (status == 'done' && id != null && !_notifiedDoneIds.contains(id)) {\n        _notifiedDoneIds.add(id);\n        onJobDone?.call(job);\n      }\n    }\n\n    notifyListeners();\n  }\n\n  // ── Query helpers ──────────────────────────────────────────────────────────\n\n  /// Returns the most recent active-or-queued job for the given [appId],\n  /// or `null` if none exists.\n  Map<String, dynamic>? jobForApp(int appId) {\n    for (final job in jobs) {\n      final jobAppId = job['app_id'] ?? job['apps']?['id'];\n      if (jobAppId == appId) return job;\n    }\n    return null;\n  }\n\n  /// Force an immediate poll (useful after enqueuing a new job).\n  Future<void> refresh() => _poll();\n}\n\nbool _isActive(String? status) =>\n    status == 'queued' ||\n    status == 'downloading' ||\n    status == 'extracting' ||\n    status == 'uploading';\n"
+        }
+    ]
+}

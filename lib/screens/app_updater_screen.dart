@@ -426,7 +426,7 @@ class _ApkTile extends StatelessWidget {
             )
           : entry.changelog != null
           ? Text(
-              _changelogPreview(entry.changelog!),
+              '${_changelogPreview(entry.changelog!)}  •  ${_formatBytes(entry.sizeBytes)}',
               style: const TextStyle(fontSize: 12),
               overflow: TextOverflow.ellipsis,
             )

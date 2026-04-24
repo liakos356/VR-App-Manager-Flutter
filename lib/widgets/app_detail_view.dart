@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:installed_apps/installed_apps.dart';
 
 import '../install_service.dart';
+import '../services/download_jobs_notifier.dart';
+import '../services/download_service.dart';
 import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
@@ -44,6 +47,11 @@ class _AppDetailViewState extends State<AppDetailView>
   double _installProgress = 0.0;
   String _installStatus = 'Starting...';
 
+  // ── Download queue state ──────────────────────────────────────────────────
+  Map<String, dynamic>? _dlJob;
+  bool _dlLoading = false;
+  Timer? _dlPollTimer;
+
   // Cached derived fields — updated in initState/didUpdateWidget.
   List<String> _screenshots = [];
   List<String> _tags = [];
@@ -61,6 +69,7 @@ class _AppDetailViewState extends State<AppDetailView>
     WidgetsBinding.instance.addObserver(this);
     StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
     _refreshInstallState();
+    _refreshDlJob();
   }
 
   @override
@@ -69,6 +78,7 @@ class _AppDetailViewState extends State<AppDetailView>
     if (oldWidget.app != widget.app) {
       _updateDerivedFields();
       _refreshInstallState();
+      _refreshDlJob();
     }
   }
 
@@ -76,11 +86,95 @@ class _AppDetailViewState extends State<AppDetailView>
   void dispose() {
     StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
     WidgetsBinding.instance.removeObserver(this);
+    _dlPollTimer?.cancel();
     super.dispose();
   }
 
   void _onFavoritesChanged() {
     if (mounted) setState(() {});
+  }
+
+  // ── Download job helpers ─────────────────────────────────────────────────
+
+  Future<void> _refreshDlJob() async {
+    final appId = widget.app['id'];
+    if (appId == null) return;
+    final int id = appId is int ? appId : int.tryParse(appId.toString()) ?? -1;
+    if (id < 0) return;
+    try {
+      final jobs = await DownloadService().listJobs();
+      final match = jobs.where((j) {
+        final jId = j['app_id'] ?? j['apps']?['id'];
+        return jId == id;
+      }).toList();
+      if (!mounted) return;
+      setState(() => _dlJob = match.isNotEmpty ? match.first : null);
+      // If there's an active job, start polling; otherwise stop.
+      final isActive = _isActiveJob(_dlJob);
+      if (isActive && _dlPollTimer == null) {
+        _dlPollTimer = Timer.periodic(
+          const Duration(seconds: 2),
+          (_) => _refreshDlJob(),
+        );
+      } else if (!isActive) {
+        _dlPollTimer?.cancel();
+        _dlPollTimer = null;
+        if (_dlJob?['status'] == 'done') {
+          _refreshInstallState();
+        }
+      }
+    } catch (_) {}
+  }
+
+  bool _isActiveJob(Map<String, dynamic>? job) {
+    final s = job?['status']?.toString();
+    return s == 'queued' ||
+        s == 'downloading' ||
+        s == 'extracting' ||
+        s == 'uploading';
+  }
+
+  Future<void> _enqueueDownload() async {
+    final appId = widget.app['id'];
+    if (appId == null) return;
+    final int id = appId is int ? appId : int.tryParse(appId.toString()) ?? -1;
+    if (id < 0) return;
+    setState(() => _dlLoading = true);
+    try {
+      await DownloadService().enqueue(id);
+      await DownloadJobsNotifier.instance.refresh();
+      await _refreshDlJob();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${tr('Error')}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _dlLoading = false);
+    }
+  }
+
+  Future<void> _cancelDlJob() async {
+    final jobId = _dlJob?['id'] as int?;
+    if (jobId == null) return;
+    try {
+      await DownloadService().cancelOrDelete(jobId);
+      await DownloadJobsNotifier.instance.refresh();
+      await _refreshDlJob();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${tr('Error')}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -237,6 +331,144 @@ class _AppDetailViewState extends State<AppDetailView>
 
   // ── Full-screen two-column layout (used when pushed as a page) ────────────
 
+  /// Builds the download section shown in the detail view.
+  Widget _buildDownloadSection(BuildContext context) {
+    final dlPct =
+        (widget.app['download_percentage'] as num?)?.toDouble() ?? 100.0;
+    final telegramUrl = widget.app['telegram_url']?.toString() ?? '';
+    final apkReady =
+        widget.app['apk_path']?.toString().trim().isNotEmpty == true;
+
+    // Nothing to show if the app is fully available and no active job.
+    if (dlPct >= 100 && _dlJob == null && apkReady)
+      return const SizedBox.shrink();
+
+    final jobStatus = _dlJob?['status']?.toString();
+    final jobProgress = (_dlJob?['progress'] as num?)?.toDouble() ?? 0.0;
+    final jobStep = _dlJob?['step']?.toString() ?? '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tr('Drive Download'),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+
+          // No job yet
+          if (_dlJob == null) ...[
+            if (dlPct < 100 && telegramUrl.isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: _dlLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.downloading, size: 18),
+                  label: Text(tr('Queue Download (Telegram \u2192 Drive)')),
+                  onPressed: _dlLoading ? null : _enqueueDownload,
+                ),
+              )
+            else
+              Text(
+                tr('No download job active'),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+          ]
+          // Active job
+          else if (_isActiveJob(_dlJob)) ...[
+            Row(
+              children: [
+                _StatusChipSmall(status: jobStatus ?? ''),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 16),
+                  label: Text(tr('Cancel')),
+                  onPressed: _cancelDlJob,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: jobProgress / 100.0,
+              backgroundColor: Colors.grey.shade700,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              jobStep.isNotEmpty
+                  ? '$jobStep \u00b7 ${jobProgress.toStringAsFixed(0)}%'
+                  : '${jobProgress.toStringAsFixed(0)}%',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ]
+          // Done
+          else if (jobStatus == 'done') ...[
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    tr('Ready \u2014 tap Install to continue'),
+                    style: const TextStyle(color: Colors.green, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ]
+          // Error
+          else if (jobStatus == 'error') ...[
+            Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _dlJob?['error']?.toString() ?? tr('Download failed'),
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _enqueueDownload,
+                  child: Text(tr('Retry')),
+                ),
+              ],
+            ),
+          ]
+          // Cancelled or other finished states
+          else ...[
+            Text(
+              tr('Download ${jobStatus ?? 'unknown'}'),
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            if (telegramUrl.isNotEmpty)
+              TextButton.icon(
+                icon: const Icon(Icons.downloading, size: 16),
+                label: Text(tr('Re-queue')),
+                onPressed: _enqueueDownload,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildWideBody(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,7 +620,9 @@ class _AppDetailViewState extends State<AppDetailView>
                         const SizedBox(height: 16),
                         TagChips(tags: _tags),
                       ],
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+                      _buildDownloadSection(context),
+                      const SizedBox(height: 24),
                       Text(
                         tr('Description'),
                         style: const TextStyle(
@@ -601,7 +835,12 @@ class _AppDetailViewState extends State<AppDetailView>
                   const SizedBox(height: 10),
                   TagChips(tags: _tags),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+
+                // Download section
+                _buildDownloadSection(context),
+
+                const SizedBox(height: 8),
 
                 // Description
                 Text(
@@ -681,6 +920,45 @@ class _DescriptionBox extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _StatusChipSmall extends StatelessWidget {
+  final String status;
+  const _StatusChipSmall({required this.status});
+
+  Color _color() {
+    switch (status) {
+      case 'downloading':
+        return const Color(0xFF229ED9);
+      case 'extracting':
+        return const Color(0xFFF0A500);
+      case 'uploading':
+        return const Color(0xFFBC8CFF);
+      case 'done':
+        return Colors.green;
+      case 'error':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _color();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.withValues(alpha: 0.6)),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -4,10 +4,13 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../services/download_jobs_notifier.dart';
+import '../services/download_service.dart';
 import '../services/google_drive_service.dart';
 import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
+import '../utils/localization.dart';
 import 'app_detail_view.dart';
 import 'install_bottom_sheet.dart';
 import 'star_rating.dart';
@@ -44,6 +47,7 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   late List<String> _cachedImages;
   late final AnimationController _flashController;
   late final Animation<double> _flashAnimation;
+  bool _isQueueing = false;
 
   @override
   void initState() {
@@ -51,6 +55,7 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
     _cachedImages = _computeImages();
     _refreshInstallState();
     StoreFavoritesNotifier.instance.addListener(_onFavoritesChanged);
+    DownloadJobsNotifier.instance.addListener(_onDownloadJobsChanged);
     _flashController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -62,6 +67,43 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
   void _onFavoritesChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onDownloadJobsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool _shouldShowDownloadButton() {
+    final telegramUrl = widget.app['telegram_url']?.toString() ?? '';
+    if (telegramUrl.isEmpty) return false;
+    final dlPct = (widget.app['download_percentage'] as num?)?.toDouble() ?? 100.0;
+    return dlPct < 100.0;
+  }
+
+  Future<void> _queueDownload() async {
+    final appId = widget.app['id'];
+    if (appId == null) return;
+    setState(() => _isQueueing = true);
+    try {
+      await DownloadService().enqueue(appId is int ? appId : int.parse(appId.toString()));
+      await DownloadJobsNotifier.instance.refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr('Download queued!'))),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${tr('Error')}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isQueueing = false);
+    }
   }
 
   @override
@@ -76,6 +118,7 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
   void dispose() {
     _flashController.dispose();
     StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
+    DownloadJobsNotifier.instance.removeListener(_onDownloadJobsChanged);
     // Do NOT evict images from CachedNetworkImage's disk/memory cache here.
     // Evicting on dispose defeats the purpose of caching: images would need
     // to be re-downloaded every time a card re-enters the viewport while
@@ -361,6 +404,43 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
                                   ),
                                 ),
                               ),
+                            ),
+                          // ── Telegram download button ────────────────────
+                          if (_shouldShowDownloadButton())
+                            Positioned(
+                              top: isUnavailable ? 38 : 8,
+                              left: 8,
+                              child: _isQueueing
+                                  ? Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF229ED9),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(6),
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: _queueDownload,
+                                      child: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF229ED9),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.downloading,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
                             ),
                           if (isNewApp)
                             Positioned(

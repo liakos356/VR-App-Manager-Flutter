@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../db_service.dart';
+import '../services/download_jobs_notifier.dart';
 import '../services/google_drive_service.dart';
 import '../services/store_favorites_service.dart';
 import '../utils/app_filter.dart' as filter;
@@ -15,9 +16,11 @@ import '../widgets/app_detail_panel.dart';
 import '../widgets/app_list_tile.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/genre_side_panel.dart';
+import '../widgets/install_bottom_sheet.dart';
 import '../widgets/main_filter_bar.dart';
 import '../widgets/settings_side_panel.dart';
 import 'app_updater_screen.dart';
+import 'download_queue_screen.dart';
 import 'installed_apps_screen.dart';
 
 const String _kApiUrl = 'http://192.168.1.17:8001/api';
@@ -120,6 +123,10 @@ class MainScreenState extends State<MainScreen> {
       });
     });
     _cardSizeNotifier.addListener(_savePreferences);
+
+    // Start download-jobs polling and register the "App Ready" callback.
+    DownloadJobsNotifier.instance.onJobDone = _onDownloadJobDone;
+    DownloadJobsNotifier.instance.startPolling();
   }
 
   @override
@@ -130,6 +137,8 @@ class MainScreenState extends State<MainScreen> {
     _cardSizeNotifier.dispose();
     _masterDetailScrollController.dispose();
     StoreFavoritesNotifier.instance.removeListener(_onFavoritesChanged);
+    DownloadJobsNotifier.instance.stopPolling();
+    DownloadJobsNotifier.instance.onJobDone = null;
     super.dispose();
   }
 
@@ -137,6 +146,32 @@ class MainScreenState extends State<MainScreen> {
 
   void _onFavoritesChanged() {
     if (mounted && _favoritesOnly) setState(() => _refilter());
+  }
+
+  void _onDownloadJobDone(Map<String, dynamic> job) {
+    if (!mounted) return;
+    final app = job['apps'] as Map<String, dynamic>?;
+    final appName = app?['name'] ?? app?['title'] ?? 'App';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${tr('Ready to install')}: $appName'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: tr('Install Now'),
+          onPressed: () {
+            if (app != null) {
+              showInstallBottomSheet(
+                context,
+                app: app,
+                isInstalled: false,
+                installedPackageName: '',
+                onInstallDone: () {},
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void _loadPreferences(SharedPreferences prefs) {
@@ -339,6 +374,26 @@ class MainScreenState extends State<MainScreen> {
                     ),
                   ),
                 ),
+              ),
+              // ── Download Queue button ──────────────────────────────────
+              ListenableBuilder(
+                listenable: DownloadJobsNotifier.instance,
+                builder: (context, _) {
+                  final count = DownloadJobsNotifier.instance.activeCount;
+                  return DownloadQueueBadge(
+                    count: count,
+                    child: IconButton(
+                      icon: const Icon(Icons.downloading),
+                      tooltip: tr('Download Queue'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DownloadQueueScreen(),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
               IconButton(
                 icon: Icon(_settingsPanelOpen ? Icons.tune : Icons.tune),
