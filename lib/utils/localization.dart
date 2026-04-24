@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 final ValueNotifier<bool> isGreekNotifier = ValueNotifier(false);
 final ValueNotifier<int> accentIndexNotifier = ValueNotifier(0);
+final ValueNotifier<double> uiScaleNotifier = ValueNotifier(1.0);
 
 class AccentColorOption {
   final String name;

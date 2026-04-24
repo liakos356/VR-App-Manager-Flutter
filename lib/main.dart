@@ -34,6 +34,7 @@ void main() async {
     } else if (themePref == 'light') {
       themeNotifier.value = ThemeMode.light;
     }
+    uiScaleNotifier.value = (prefs.getDouble('uiScale') ?? 1.0).clamp(0.7, 1.5);
   });
 
   // Pre-warm the installed-apps cache now so that when the grid renders
@@ -119,6 +120,39 @@ class AppManagerApp extends StatelessWidget {
                   hintStyle: const TextStyle(color: Colors.white54),
                 ),
               ),
+              builder: (context, child) {
+                return ValueListenableBuilder<double>(
+                  valueListenable: uiScaleNotifier,
+                  builder: (_, scale, _) {
+                    if (scale == 1.0) return child!;
+                    final mq = MediaQuery.of(context);
+                    final virtualWidth = mq.size.width / scale;
+                    final virtualHeight = mq.size.height / scale;
+                    // FittedBox correctly scales both rendering AND hit-testing.
+                    // The inner SizedBox lays out at virtualSize (same aspect
+                    // ratio as realSize), so FittedBox.fill = FittedBox.contain
+                    // and no distortion or empty space occurs.
+                    return SizedBox(
+                      width: mq.size.width,
+                      height: mq.size.height,
+                      child: FittedBox(
+                        fit: BoxFit.fill,
+                        alignment: Alignment.topLeft,
+                        child: SizedBox(
+                          width: virtualWidth,
+                          height: virtualHeight,
+                          child: MediaQuery(
+                            data: mq.copyWith(
+                              size: Size(virtualWidth, virtualHeight),
+                            ),
+                            child: child!,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
               home: const HomeScreen(),
             );
           },

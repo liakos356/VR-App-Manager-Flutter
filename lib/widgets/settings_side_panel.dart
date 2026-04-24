@@ -344,6 +344,62 @@ class _OpenPanel extends StatelessWidget {
                   },
                 ),
 
+                // ── UI Scale ─────────────────────────────────────────────
+                ValueListenableBuilder<double>(
+                  valueListenable: uiScaleNotifier,
+                  builder: (context, scale, _) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.zoom_in_outlined,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                              const SizedBox(width: 16),
+                              const Text(
+                                'UI Scale',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${(scale * 100).round()}%',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const SizedBox(width: 40),
+                              Expanded(
+                                child: Slider(
+                                  value: scale,
+                                  min: 0.7,
+                                  max: 1.5,
+                                  divisions: 16,
+                                  label: '${(scale * 100).round()}%',
+                                  onChanged: (v) async {
+                                    uiScaleNotifier.value = v;
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.setDouble('uiScale', v);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
                 // ── Ovrport Only ─────────────────────────────────────────
                 ListTile(
                   leading: const Icon(Icons.vrpano_outlined),
