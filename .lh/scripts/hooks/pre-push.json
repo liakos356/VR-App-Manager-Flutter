@@ -1,0 +1,18 @@
+{
+    "sourceFile": "scripts/hooks/pre-push",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1777041059783,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1777041059783,
+            "name": "Commit-0",
+            "content": "#!/usr/bin/env bash\n# pre-push hook — builds & deploys the Flutter APK to Google Drive whenever\n# a push targets the main or master branch.\n#\n# Install once with:\n#   cp scripts/hooks/pre-push .git/hooks/pre-push\n#   chmod +x .git/hooks/pre-push\n# Or run: bash scripts/install_hooks.sh\n\nset -euo pipefail\n\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\n\nSHOULD_BUILD=0\nwhile IFS=' ' read -r _local_ref _local_sha remote_ref _remote_sha; do\n    if [[ \"$remote_ref\" == \"refs/heads/main\" || \\\n          \"$remote_ref\" == \"refs/heads/master\" ]]; then\n        SHOULD_BUILD=1\n        break\n    fi\ndone\n\nif [[ \"$SHOULD_BUILD\" -eq 0 ]]; then\n    # Not pushing to main/master — skip the build.\n    exit 0\nfi\n\necho \"\"\necho \">>> [pre-push] Push to main detected — starting build & deploy…\"\necho \"\"\n\n# Run from the repo root so relative paths in the build script resolve correctly.\ncd \"$REPO_ROOT\"\nexec bash scripts/build_and_copy.sh\n"
+        }
+    ]
+}

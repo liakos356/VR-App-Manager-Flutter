@@ -44,11 +44,16 @@ class StoreApkEntry {
   final DateTime timestamp;
   final int sizeBytes;
 
+  /// The changelog stored as the Drive file's description field.
+  /// Null when no description has been set for this release.
+  final String? changelog;
+
   const StoreApkEntry({
     required this.fileId,
     required this.fileName,
     required this.timestamp,
     required this.sizeBytes,
+    this.changelog,
   });
 
   /// The `YYYYMMDD_HHMM` portion used as a human-readable build identifier.
@@ -374,7 +379,7 @@ class GoogleDriveService {
     final result = await api.files.list(
       q: "'$parentId' in parents and trashed=false",
       spaces: 'drive',
-      $fields: 'files(id,name,size,mimeType)',
+      $fields: 'files(id,name,size,mimeType,description)',
     );
     return result.files ?? const [];
   }
@@ -429,6 +434,7 @@ class GoogleDriveService {
           fileName: f.name!,
           timestamp: ts,
           sizeBytes: int.tryParse(f.size ?? '0') ?? 0,
+          changelog: f.description?.isNotEmpty == true ? f.description : null,
         ),
       );
     }

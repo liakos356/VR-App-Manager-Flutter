@@ -1,0 +1,18 @@
+{
+    "sourceFile": "scripts/install_hooks.sh",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1777041059783,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1777041059783,
+            "name": "Commit-0",
+            "content": "#!/usr/bin/env bash\n# Installs the git hooks from scripts/hooks/ into .git/hooks/.\n# Run once after cloning: bash scripts/install_hooks.sh\n\nset -euo pipefail\n\nREPO_ROOT=\"$(git rev-parse --show-toplevel)\"\nHOOKS_SRC=\"${REPO_ROOT}/scripts/hooks\"\nHOOKS_DEST=\"${REPO_ROOT}/.git/hooks\"\n\nfor hook in \"$HOOKS_SRC\"/*; do\n    name=\"$(basename \"$hook\")\"\n    dest=\"${HOOKS_DEST}/${name}\"\n    cp \"$hook\" \"$dest\"\n    chmod +x \"$dest\"\n    echo \"Installed hook: .git/hooks/${name}\"\ndone\n\necho \"All hooks installed successfully.\"\n"
+        }
+    ]
+}

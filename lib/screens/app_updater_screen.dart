@@ -316,6 +316,49 @@ class _AppUpdaterScreenState extends State<AppUpdaterScreen> {
 
 // ── Tile widget ────────────────────────────────────────────────────────────
 
+String _changelogPreview(String changelog) {
+  final firstLine = changelog
+      .split('\n')
+      .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '')
+      .trim();
+  if (firstLine.isEmpty) return '';
+  return firstLine.length <= 80 ? firstLine : '${firstLine.substring(0, 77)}…';
+}
+
+void _showChangelogDialog(
+  BuildContext context,
+  StoreApkEntry entry,
+  VoidCallback? onInstall,
+) {
+  showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text('Changelog · ${_formatTimestamp(entry.timestamp)}'),
+      content: SingleChildScrollView(
+        child: Text(
+          entry.changelog!,
+          style: const TextStyle(fontSize: 13, height: 1.55),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+        if (onInstall != null)
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              onInstall();
+            },
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Install'),
+          ),
+      ],
+    ),
+  );
+}
+
 class _ApkTile extends StatelessWidget {
   final StoreApkEntry entry;
   final DateTime currentBuild;
@@ -381,6 +424,12 @@ class _ApkTile extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: LinearProgressIndicator(value: downloadProgress),
             )
+          : entry.changelog != null
+          ? Text(
+              _changelogPreview(entry.changelog!),
+              style: const TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            )
           : Text(
               '${entry.fileName}  •  ${_formatBytes(entry.sizeBytes)}',
               style: const TextStyle(fontSize: 12),
@@ -401,7 +450,15 @@ class _ApkTile extends StatelessWidget {
                   : 'Install this version',
               onPressed: onInstall,
             ),
-      onTap: isCurrent || onInstall == null ? null : onInstall,
+      onTap: entry.changelog != null
+          ? () => _showChangelogDialog(
+              context,
+              entry,
+              isCurrent ? null : onInstall,
+            )
+          : isCurrent || onInstall == null
+          ? null
+          : onInstall,
     );
   }
 }

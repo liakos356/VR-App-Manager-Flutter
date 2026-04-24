@@ -105,9 +105,44 @@ if [[ $NEEDS_TROUBLESHOOT -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Changelog generation
+# ---------------------------------------------------------------------------
+generate_changelog() {
+    # Find the most recent release tag (format: release/YYYYMMDD_HHMM).
+    local last_tag
+    last_tag=$(git describe --tags --match "release/*" --abbrev=0 2>/dev/null || echo "")
+
+    local log
+    if [[ -n "$last_tag" ]]; then
+        echo "Generating changelog since tag: ${last_tag}" >&2
+        log=$(git log --no-merges --format="- %s" "${last_tag}..HEAD" 2>/dev/null)
+    else
+        echo "No previous release tag found — using last 20 commits." >&2
+        log=$(git log --no-merges --format="- %s" -20 2>/dev/null)
+    fi
+
+    if [[ -z "$log" ]]; then
+        echo "- No changes noted"
+    else
+        echo "$log"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 echo "Building Flutter APK (Release)..."
+
+# Generate changelog from git history (can be overridden via env var CHANGELOG).
+if [[ -z "$CHANGELOG" ]]; then
+    CHANGELOG=$(generate_changelog)
+fi
+
+echo ""
+echo "==== Changelog for this release ===="
+echo "$CHANGELOG"
+echo "===================================="
+echo ""
 
 # Generate the build timestamp and embed it into lib/utils/build_info.dart
 # so the app can compare itself against Drive APK filenames at runtime.
@@ -118,29 +153,54 @@ echo "// Format: YYYYMMDD_HHMM matching the uploaded APK filename convention." >
 echo "const String kBuildTimestamp = '$TIMESTAMP';" >> "$BUILD_INFO_FILE"
 echo "Embedded build timestamp $TIMESTAMP into $BUILD_INFO_FILE"
 
+# ---------------------------------------------------------------------------
+# upload_apk  path  dest  [retry_on_fail]
+# Sets Drive file description to $CHANGELOG after a successful upload.
+# ---------------------------------------------------------------------------
+upload_apk() {
+    local src="$1"
+    local dest="$2"
+    local filename="$3"
+
+    # rclone >= 1.64 supports --metadata / --metadata-set for Drive description.
+    # Newlines inside the value are passed safely because the variable is quoted.
+    if rclone copyto "$src" "$dest" \
+            --metadata \
+            --metadata-set "description=${CHANGELOG}" \
+            --progress; then
+        echo "APK uploaded successfully to ${dest}"
+        return 0
+    fi
+    return 1
+}
+
 if flutter build apk --release; then
     FILENAME="${TIMESTAMP}_store.apk"
     DEST_PATH="${GDRIVE_REMOTE}:${GDRIVE_DEST}/${FILENAME}"
 
     echo "Build successful! Uploading to ${DEST_PATH}..."
 
-    if rclone copyto "$APK_PATH" "$DEST_PATH" --progress; then
-        echo "APK uploaded successfully to ${DEST_PATH}"
-    else
+    if ! upload_apk "$APK_PATH" "$DEST_PATH" "$FILENAME"; then
         echo ""
         echo "Upload failed."
         if ask_yes_no "Run troubleshooter to diagnose the issue?"; then
             troubleshoot_rclone
             echo "Retrying upload..."
-            if rclone copyto "$APK_PATH" "$DEST_PATH" --progress; then
-                echo "APK uploaded successfully to ${DEST_PATH}"
-            else
+            if ! upload_apk "$APK_PATH" "$DEST_PATH" "$FILENAME"; then
                 echo "Upload still failed. Check rclone logs with: rclone copyto \"$APK_PATH\" \"$DEST_PATH\" -vv"
                 exit 1
             fi
         else
             exit 1
         fi
+    fi
+
+    # Tag the commit so the next build can generate an accurate changelog.
+    RELEASE_TAG="release/${TIMESTAMP}"
+    if git tag "$RELEASE_TAG" 2>/dev/null; then
+        echo "Tagged release as ${RELEASE_TAG}"
+    else
+        echo "Note: tag ${RELEASE_TAG} already exists, skipping."
     fi
 else
     echo "Build failed. Not uploading."

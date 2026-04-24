@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# pre-push hook — builds & deploys the Flutter APK to Google Drive whenever
+# a push targets the main or master branch.
+#
+# Install once with:
+#   cp scripts/hooks/pre-push .git/hooks/pre-push
+#   chmod +x .git/hooks/pre-push
+# Or run: bash scripts/install_hooks.sh
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+SHOULD_BUILD=0
+while IFS=' ' read -r _local_ref _local_sha remote_ref _remote_sha; do
+    if [[ "$remote_ref" == "refs/heads/main" || \
+          "$remote_ref" == "refs/heads/master" ]]; then
+        SHOULD_BUILD=1
+        break
+    fi
+done
+
+if [[ "$SHOULD_BUILD" -eq 0 ]]; then
+    # Not pushing to main/master — skip the build.
+    exit 0
+fi
+
+echo ""
+echo ">>> [pre-push] Push to main detected — starting build & deploy…"
+echo ""
+
+# Run from the repo root so relative paths in the build script resolve correctly.
+cd "$REPO_ROOT"
+exec bash scripts/build_and_copy.sh
