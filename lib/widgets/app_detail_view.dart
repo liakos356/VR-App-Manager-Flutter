@@ -560,6 +560,14 @@ class _AppDetailViewState extends State<AppDetailView>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (_isInstalled &&
+                              _installedPackageName.isNotEmpty) ...[
+                            AppDetailLaunchButton(
+                              packageName: _installedPackageName,
+                              compact: true,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                           AppDetailInstallButton(
                             isInstalled: _isInstalled,
                             isInstalling: _isInstalling,
@@ -584,14 +592,6 @@ class _AppDetailViewState extends State<AppDetailView>
                                       : _handleInstallTap),
                             compact: true,
                           ),
-                          if (_isInstalled &&
-                              _installedPackageName.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            AppDetailLaunchButton(
-                              packageName: _installedPackageName,
-                              compact: true,
-                            ),
-                          ],
                           if (_videoUrl != null && _videoUrl!.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             AppDetailTrailerButton(
@@ -700,11 +700,40 @@ class _AppDetailViewState extends State<AppDetailView>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Right column: Install/Uninstall + Launch
+                      // Right column: Launch + Install/Uninstall
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (_isInstalled &&
+                                _installedPackageName.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppDetailLaunchButton(
+                                      packageName: _installedPackageName,
+                                      compact: true,
+                                    ),
+                                  ),
+                                  if (appId.isNotEmpty)
+                                    IconButton(
+                                      tooltip: isFav
+                                          ? 'Remove from favorites'
+                                          : 'Add to favorites',
+                                      icon: Icon(
+                                        isFav
+                                            ? Icons.star_rounded
+                                            : Icons.star_border_rounded,
+                                        color: isFav ? Colors.amber : null,
+                                      ),
+                                      onPressed: () => StoreFavoritesNotifier
+                                          .instance
+                                          .toggle(appId),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                             Row(
                               children: [
                                 Expanded(
@@ -734,7 +763,7 @@ class _AppDetailViewState extends State<AppDetailView>
                                     compact: true,
                                   ),
                                 ),
-                                if (appId.isNotEmpty)
+                                if (!_isInstalled && appId.isNotEmpty)
                                   IconButton(
                                     tooltip: isFav
                                         ? 'Remove from favorites'
@@ -751,14 +780,6 @@ class _AppDetailViewState extends State<AppDetailView>
                                   ),
                               ],
                             ),
-                            if (_isInstalled &&
-                                _installedPackageName.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              AppDetailLaunchButton(
-                                packageName: _installedPackageName,
-                                compact: true,
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -769,6 +790,33 @@ class _AppDetailViewState extends State<AppDetailView>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (_isInstalled && _installedPackageName.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppDetailLaunchButton(
+                                packageName: _installedPackageName,
+                                compact: true,
+                              ),
+                            ),
+                            if (appId.isNotEmpty)
+                              IconButton(
+                                tooltip: isFav
+                                    ? 'Remove from favorites'
+                                    : 'Add to favorites',
+                                icon: Icon(
+                                  isFav
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  color: isFav ? Colors.amber : null,
+                                ),
+                                onPressed: () => StoreFavoritesNotifier.instance
+                                    .toggle(appId),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -798,7 +846,7 @@ class _AppDetailViewState extends State<AppDetailView>
                               compact: true,
                             ),
                           ),
-                          if (appId.isNotEmpty)
+                          if (!_isInstalled && appId.isNotEmpty)
                             IconButton(
                               tooltip: isFav
                                   ? 'Remove from favorites'
@@ -814,13 +862,6 @@ class _AppDetailViewState extends State<AppDetailView>
                             ),
                         ],
                       ),
-                      if (_isInstalled && _installedPackageName.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        AppDetailLaunchButton(
-                          packageName: _installedPackageName,
-                          compact: true,
-                        ),
-                      ],
                     ],
                   ),
                 const SizedBox(height: 14),

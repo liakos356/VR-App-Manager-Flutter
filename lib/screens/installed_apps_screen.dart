@@ -3,10 +3,13 @@ import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/app_enrichment_service.dart';
 import '../services/favorites_service.dart';
 import '../utils/installed_apps_cache.dart';
+import '../widgets/adjustable_split_view.dart';
+import '../widgets/installed_app_detail_panel.dart';
 
-enum AppViewMode { list, grid, iconOnly, detailList }
+enum AppViewMode { list, grid, iconOnly, detailList, masterDetail }
 
 enum AppSortOption { installTime, name, packageName }
 
@@ -19,11 +22,15 @@ class InstalledAppsScreen extends StatefulWidget {
   final ValueChanged<bool>? onToggleInstalledApps;
   final ValueChanged<int>? onAppCountChanged;
 
+  /// Optional Supabase catalog apps used to look up descriptions by package name.
+  final List<dynamic> dbApps;
+
   const InstalledAppsScreen({
     super.key,
     this.searchQuery = '',
     this.onToggleInstalledApps,
     this.onAppCountChanged,
+    this.dbApps = const [],
   });
 
   @override
@@ -33,6 +40,13 @@ class InstalledAppsScreen extends StatefulWidget {
 class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   List<AppInfo> _allApps = [];
   bool _isLoading = true;
+
+  // Enrichment: sizes loaded asynchronously, keyed by packageName
+  final Map<String, String> _appSizeLabels = {};
+  final _enrichment = AppEnrichmentService.instance;
+
+  // Master-detail selection
+  AppInfo? _selectedApp;
 
   // View state
   AppViewMode _viewMode = AppViewMode.grid;
@@ -112,9 +126,20 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
         _allApps = apps;
         _isLoading = false;
       });
+      _loadAllSizes(apps);
     } catch (e) {
       debugPrint('Error loading installed apps: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadAllSizes(List<AppInfo> apps) async {
+    for (final app in apps) {
+      if (_appSizeLabels.containsKey(app.packageName)) continue;
+      final label = await _enrichment.getAppSizeLabel(app);
+      if (mounted) {
+        setState(() => _appSizeLabels[app.packageName] = label);
+      }
     }
   }
 
@@ -202,21 +227,89 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   }
 
   void _showDetailsDialog(AppInfo app) {
+    final description = _enrichment.getDescription(
+      app.packageName,
+      widget.dbApps,
+    );
+    final sizeLabel = _appSizeLabels[app.packageName] ?? 'Loading…';
+    final installDate = app.installedTimestamp != 0
+        ? DateTime.fromMillisecondsSinceEpoch(app.installedTimestamp)
+        : null;
+    final installDateStr = installDate != null
+        ? '${installDate.year}-'
+              '${installDate.month.toString().padLeft(2, '0')}-'
+              '${installDate.day.toString().padLeft(2, '0')}'
+        : 'Unknown';
+
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(app.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text('Package: ${app.packageName}'),
-            const SizedBox(height: 8),
-            Text('Version: ${app.versionName} (${app.versionCode})'),
-            // AppInfo does not expose size natively on all platforms without native code additions
-            const SizedBox(height: 8),
-            const Text('Size: Unknown'),
+            if (app.icon != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Image.memory(app.icon!, fit: BoxFit.contain),
+                ),
+              ),
+            Expanded(child: Text(app.name, overflow: TextOverflow.ellipsis)),
           ],
+        ),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _detailRow(
+                  Icons.inventory_2_outlined,
+                  'Package',
+                  app.packageName,
+                ),
+                const Divider(height: 16),
+                _detailRow(
+                  Icons.label_outline,
+                  'Version',
+                  '${app.versionName} (build ${app.versionCode})',
+                ),
+                const Divider(height: 16),
+                _detailRow(Icons.storage_outlined, 'Size', sizeLabel),
+                const Divider(height: 16),
+                _detailRow(
+                  Icons.calendar_today_outlined,
+                  'Installed',
+                  installDateStr,
+                ),
+                if (description.isNotEmpty) ...[
+                  const Divider(height: 16),
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Description',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: 8,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
@@ -225,6 +318,27 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  static Widget _detailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 13),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 
@@ -395,6 +509,13 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                     icon: Tooltip(
                       message: 'Detailed List',
                       child: Icon(Icons.view_agenda),
+                    ),
+                  ),
+                  ButtonSegment(
+                    value: AppViewMode.masterDetail,
+                    icon: Tooltip(
+                      message: 'Master-Detail',
+                      child: Icon(Icons.vertical_split_outlined),
                     ),
                   ),
                 ],
@@ -616,9 +737,142 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
               ? _buildIconOnlyView(appsToDisplay)
               : _viewMode == AppViewMode.detailList
               ? _buildDetailsListView(appsToDisplay)
+              : _viewMode == AppViewMode.masterDetail
+              ? _buildMasterDetailView(appsToDisplay)
               : _buildGridView(appsToDisplay),
         ),
       ],
+    );
+  }
+
+  Widget _buildMasterDetailView(List<AppInfo> apps) {
+    // Keep _selectedApp valid when the list changes.
+    final AppInfo? effectiveSelected =
+        _selectedApp != null &&
+            apps.any((a) => a.packageName == _selectedApp!.packageName)
+        ? apps.firstWhere((a) => a.packageName == _selectedApp!.packageName)
+        : null;
+
+    final masterList = ListView.builder(
+      itemCount: apps.length,
+      itemBuilder: (context, index) {
+        final app = apps[index];
+        final isSelected = app.packageName == effectiveSelected?.packageName;
+        final isNew = _isNewApp(app);
+
+        return Material(
+          color: isSelected
+              ? Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withValues(alpha: 0.55)
+              : Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() => _selectedApp = app);
+            },
+            child: Container(
+              decoration: isSelected
+                  ? BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 3,
+                        ),
+                      ),
+                    )
+                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: app.icon != null
+                              ? Image.memory(app.icon!, fit: BoxFit.contain)
+                              : const Icon(Icons.android),
+                        ),
+                        if (isNew)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'NEW',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          app.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${app.versionName}  \u2022  ${_appSizeLabels[app.packageName] ?? '\u2026'}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.55),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_favoritePackages.contains(app.packageName))
+                    const Icon(Icons.star, color: Colors.amber, size: 14),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    final detailPanel = InstalledAppDetailPanel(
+      app: effectiveSelected,
+      dbApps: widget.dbApps,
+      favoritePackages: _favoritePackages,
+      onToggleFavorite: _toggleFavorite,
+      onUninstall: effectiveSelected != null
+          ? () => _showUninstallDialog(effectiveSelected)
+          : null,
+    );
+
+    return AdjustableSplitView(
+      initialLeftWidthPercentage: 0.38,
+      left: masterList,
+      right: detailPanel,
     );
   }
 
@@ -637,8 +891,12 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
         final app = apps[index];
         final isSelected = _selectedPackages.contains(app.packageName);
         final isNew = _isNewApp(app);
+        final sizeLabel = _appSizeLabels[app.packageName];
+        final tooltipMsg = sizeLabel != null
+            ? '${app.name}\n${app.packageName}\n$sizeLabel'
+            : '${app.name}\n${app.packageName}';
         return Tooltip(
-          message: app.name,
+          message: tooltipMsg,
           child: GestureDetector(
             onTap: _isSelectionMode
                 ? () => _toggleSelection(app.packageName)
@@ -877,7 +1135,40 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                               installDateStr,
                               style: const TextStyle(fontSize: 11),
                             ),
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.storage_outlined,
+                              size: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              _appSizeLabels[app.packageName] ?? '…',
+                              style: const TextStyle(fontSize: 11),
+                            ),
                           ],
+                        ),
+                        Builder(
+                          builder: (_) {
+                            final desc = _enrichment.getDescription(
+                              app.packageName,
+                              widget.dbApps,
+                            );
+                            if (desc.isEmpty) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                desc,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.75),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1028,7 +1319,10 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
               ],
             ],
           ),
-          subtitle: Text('${app.packageName}\nv${app.versionName}'),
+          subtitle: Text(
+            '${app.packageName}\n'
+            'v${app.versionName}  \u2022  ${_appSizeLabels[app.packageName] ?? '\u2026'}',
+          ),
           isThreeLine: true,
           trailing: _isSelectionMode
               ? Checkbox(
@@ -1154,6 +1448,20 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12),
                       ),
+                      if (_appSizeLabels[app.packageName] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            _appSizeLabels[app.packageName]!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

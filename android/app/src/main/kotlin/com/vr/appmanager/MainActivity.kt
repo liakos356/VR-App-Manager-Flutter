@@ -1,6 +1,7 @@
 package com.vr.appmanager
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -37,8 +38,43 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "APK path not provided", null)
                     }
                 }
+                "getApkSize" -> {
+                    val packageName = call.argument<String>("packageName")
+                    if (packageName != null) {
+                        result.success(getApkSize(packageName))
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Package name not provided", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    /**
+     * Returns the total size in bytes of all APK files for [packageName] by reading
+     * the source directory reported by PackageManager.  Returns -1 on error.
+     */
+    private fun getApkSize(packageName: String): Long {
+        return try {
+            val pm = packageManager
+            val appInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0L))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getApplicationInfo(packageName, 0)
+            }
+            var totalBytes = 0L
+            // sourceDir is the base APK; splitSourceDirs has additional splits
+            val allPaths = mutableListOf(appInfo.sourceDir)
+            appInfo.splitSourceDirs?.let { allPaths.addAll(it) }
+            for (path in allPaths) {
+                val f = File(path)
+                if (f.exists()) totalBytes += f.length()
+            }
+            totalBytes
+        } catch (e: Exception) {
+            -1L
         }
     }
 

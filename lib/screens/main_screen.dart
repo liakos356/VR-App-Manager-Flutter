@@ -413,6 +413,7 @@ class MainScreenState extends State<MainScreen> {
                 child: _showInstalledApps
                     ? InstalledAppsScreen(
                         searchQuery: _searchQuery,
+                        dbApps: _apps,
                         onToggleInstalledApps: (v) =>
                             setState(() => _showInstalledApps = v),
                         onAppCountChanged: (count) {
