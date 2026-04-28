@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,7 @@ import '../services/google_drive_service.dart';
 import '../services/store_favorites_service.dart';
 import '../utils/app_filter.dart' as filter;
 import '../utils/localization.dart';
+import '../utils/spatial_theme.dart';
 import '../widgets/adjustable_split_view.dart';
 import '../widgets/alpha_index_column.dart';
 import '../widgets/app_card.dart';
@@ -152,23 +154,97 @@ class MainScreenState extends State<MainScreen> {
     if (!mounted) return;
     final app = job['apps'] as Map<String, dynamic>?;
     final appName = app?['name'] ?? app?['title'] ?? 'App';
-    ScaffoldMessenger.of(context).showSnackBar(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = Theme.of(context).colorScheme.primary;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
       SnackBar(
-        content: Text('${tr('Ready to install')}: $appName'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        padding: EdgeInsets.zero,
+        margin: const EdgeInsets.all(16),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(kRadius)),
+        ),
         duration: const Duration(seconds: 8),
-        action: SnackBarAction(
-          label: tr('Install Now'),
-          onPressed: () {
-            if (app != null) {
-              showInstallBottomSheet(
-                context,
-                app: app,
-                isInstalled: false,
-                installedPackageName: '',
-                onInstallDone: () {},
-              );
-            }
-          },
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(kRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: kBlurBase, sigmaY: kBlurBase),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: glassColor(isDark),
+                borderRadius: BorderRadius.circular(kRadius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: kLightCatchBright),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.15),
+                    blurRadius: kGlowBlur * 2,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.30),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.download_done_rounded, color: accent, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${tr('Ready to install')}: $appName',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  if (app != null) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        messenger.hideCurrentSnackBar();
+                        showInstallBottomSheet(
+                          context,
+                          app: app,
+                          isInstalled: false,
+                          installedPackageName: '',
+                          onInstallDone: () {},
+                        );
+                      },
+                      child: Text(
+                        tr('Install Now'),
+                        style: TextStyle(
+                          color: accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  GestureDetector(
+                    onTap: () => messenger.hideCurrentSnackBar(),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.55)
+                          : Colors.black.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -329,26 +405,27 @@ class MainScreenState extends State<MainScreen> {
       builder: (context, isGreek, _) {
         return Scaffold(
           appBar: AppBar(
+            toolbarHeight: 52,
             title: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   child: Image.asset(
                     'assets/app_icon.png',
-                    width: 36,
-                    height: 36,
+                    width: 28,
+                    height: 28,
                     fit: BoxFit.cover,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 const Text(
                   "App Manager",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 8),
                 Expanded(
                   child: SizedBox(
-                    height: 40,
+                    height: 34,
                     child: AppSearchField(
                       apps: _apps,
                       searchHistory: _searchHistory,
@@ -361,20 +438,6 @@ class MainScreenState extends State<MainScreen> {
               ],
             ),
             actions: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Text(
-                    _showInstalledApps
-                        ? '($_installedAppsCount)'
-                        : '(${displayedApps.length} / ${_apps.length})',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
               // ── Download Queue button ──────────────────────────────────
               ListenableBuilder(
                 listenable: DownloadJobsNotifier.instance,
@@ -405,6 +468,48 @@ class MainScreenState extends State<MainScreen> {
               ),
               const SizedBox(width: 8),
             ],
+            bottom: !_showInstalledApps
+                ? MainFilterBar(
+                    viewMode: _viewMode,
+                    sortOption: _sortOption,
+                    genreSidebarOpen: _genreSidebarOpen,
+                    genreFilter: _genreFilter,
+                    onGenreToggle: () => setState(() {
+                      _genreSidebarOpen = !_genreSidebarOpen;
+                      _savePreferences();
+                    }),
+                    onClearGenre: () => setState(() {
+                      _genreFilter = 'All Genres';
+                      _refilter();
+                      _savePreferences();
+                    }),
+                    onViewModeChanged: (v) => setState(() {
+                      _viewMode = v;
+                      _savePreferences();
+                    }),
+                    onSortChanged: (v) {
+                      if (v != null) {
+                        setState(() {
+                          _sortOption = v;
+                          _refilter();
+                          _savePreferences();
+                        });
+                      }
+                    },
+                    showInstalledApps: _showInstalledApps,
+                    onToggleInstalledApps: (v) => setState(() {
+                      _showInstalledApps = v;
+                    }),
+                    favoritesOnly: _favoritesOnly,
+                    onFavoritesOnlyChanged: (v) => setState(() {
+                      _favoritesOnly = v;
+                      _refilter();
+                      _savePreferences();
+                    }),
+                    displayedCount: displayedApps.length,
+                    totalCount: _apps.length,
+                  )
+                : null,
           ),
           // body contents
           body: Stack(
@@ -426,126 +531,99 @@ class MainScreenState extends State<MainScreen> {
                           }
                         },
                       )
-                    : Column(
+                    : Row(
                         children: [
-                          MainFilterBar(
-                            viewMode: _viewMode,
-                            sortOption: _sortOption,
-                            genreSidebarOpen: _genreSidebarOpen,
-                            genreFilter: _genreFilter,
-                            onGenreToggle: () => setState(() {
-                              _genreSidebarOpen = !_genreSidebarOpen;
-                              _savePreferences();
-                            }),
-                            onClearGenre: () => setState(() {
-                              _genreFilter = 'All Genres';
-                              _refilter();
-                              _savePreferences();
-                            }),
-                            onViewModeChanged: (v) => setState(() {
-                              _viewMode = v;
-                              _savePreferences();
-                            }),
-                            onSortChanged: (v) {
-                              if (v != null) {
-                                setState(() {
-                                  _sortOption = v;
-                                  _refilter();
-                                  _savePreferences();
-                                });
-                              }
-                            },
-                            showInstalledApps: _showInstalledApps,
-                            onToggleInstalledApps: (v) => setState(() {
-                              _showInstalledApps = v;
-                            }),
-                            favoritesOnly: _favoritesOnly,
-                            onFavoritesOnlyChanged: (v) => setState(() {
-                              _favoritesOnly = v;
-                              _refilter();
-                              _savePreferences();
-                            }),
+                          AlphaIndexColumn(
+                            apps: _apps,
+                            onLetterTap: (letter) =>
+                                _onAlphaLetterTap(letter, displayedApps),
                           ),
                           Expanded(
-                            child: Row(
-                              children: [
-                                AlphaIndexColumn(
-                                  apps: _apps,
-                                  onLetterTap: (letter) =>
-                                      _onAlphaLetterTap(letter, displayedApps),
-                                ),
-                                if (_genreSidebarOpen)
-                                  GenreSidePanel(
-                                    genres: _availableGenres,
-                                    selected: _genreFilter,
-                                    getGenreCount: _getGenreCount,
-                                    onChanged: (v) => setState(() {
-                                      _genreFilter = v;
-                                      _refilter();
-                                      _savePreferences();
-                                    }),
-                                    isOpen: _genreSidebarOpen,
-                                    onToggle: () => setState(() {
-                                      _genreSidebarOpen = !_genreSidebarOpen;
-                                      _savePreferences();
-                                    }),
-                                  ),
-                                Expanded(
-                                  child: _isLoading
-                                      ? _LoadingBody(
-                                          downloadProgress: _downloadProgress,
-                                        )
-                                      : _fetchError != null
-                                      ? _ErrorBody(
-                                          message: _fetchError!,
-                                          onRetry: () =>
-                                              _fetchApps(forceRefresh: true),
-                                        )
-                                      : ValueListenableBuilder<double>(
-                                          valueListenable: _cardSizeNotifier,
-                                          builder: (context, cardSize, _) {
-                                            return LayoutBuilder(
-                                              builder: (context, constraints) {
-                                                if (_viewMode ==
-                                                    'master_detail') {
-                                                  return _buildMasterDetailView(
-                                                    displayedApps,
-                                                  );
-                                                }
-                                                return _AppGrid(
-                                                  key: _appGridKey,
-                                                  apps: displayedApps,
-                                                  apiUrl: _kApiUrl,
-                                                  constraints: constraints,
-                                                  cardSizeMultiplier: cardSize,
-                                                  cardSizeNotifier:
-                                                      _cardSizeNotifier,
-                                                  onRefresh: () => _fetchApps(
-                                                    forceRefresh: true,
-                                                    silent: true,
-                                                  ),
-                                                  onSwitchToMasterDetail: () =>
-                                                      setState(() {
-                                                        _viewMode =
-                                                            'master_detail';
-                                                        _cardSizeNotifier
-                                                                .value =
-                                                            1.0;
-                                                        _savePreferences();
-                                                      }),
-                                                );
-                                              },
+                            child: _isLoading
+                                ? _LoadingBody(
+                                    downloadProgress: _downloadProgress,
+                                  )
+                                : _fetchError != null
+                                ? _ErrorBody(
+                                    message: _fetchError!,
+                                    onRetry: () =>
+                                        _fetchApps(forceRefresh: true),
+                                  )
+                                : ValueListenableBuilder<double>(
+                                    valueListenable: _cardSizeNotifier,
+                                    builder: (context, cardSize, _) {
+                                      return LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          if (_viewMode == 'master_detail') {
+                                            return _buildMasterDetailView(
+                                              displayedApps,
                                             );
-                                          },
-                                        ),
-                                ),
-                              ],
-                            ),
+                                          }
+                                          return _AppGrid(
+                                            key: _appGridKey,
+                                            apps: displayedApps,
+                                            apiUrl: _kApiUrl,
+                                            constraints: constraints,
+                                            cardSizeMultiplier: cardSize,
+                                            cardSizeNotifier: _cardSizeNotifier,
+                                            onRefresh: () => _fetchApps(
+                                              forceRefresh: true,
+                                              silent: true,
+                                            ),
+                                            onSwitchToMasterDetail: () =>
+                                                setState(() {
+                                                  _viewMode = 'master_detail';
+                                                  _cardSizeNotifier.value = 1.0;
+                                                  _savePreferences();
+                                                }),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
               ),
-              // ── Dismiss overlay when settings panel is open ─────────────
+              // ── Genre sidebar overlay (floats over the grid) ──────────────
+              if (_genreSidebarOpen && !_showInstalledApps)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() {
+                      _genreSidebarOpen = false;
+                      _savePreferences();
+                    }),
+                    child: const ColoredBox(color: Colors.transparent),
+                  ),
+                ),
+              if (!_showInstalledApps)
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutQuint,
+                  top: 0,
+                  bottom: 0,
+                  left: _genreSidebarOpen ? 28 : -228,
+                  child: IgnorePointer(
+                    ignoring: !_genreSidebarOpen,
+                    child: GenreSidePanel(
+                      genres: _availableGenres,
+                      selected: _genreFilter,
+                      getGenreCount: _getGenreCount,
+                      onChanged: (v) => setState(() {
+                        _genreFilter = v;
+                        _refilter();
+                        _savePreferences();
+                      }),
+                      isOpen: true,
+                      onToggle: () => setState(() {
+                        _genreSidebarOpen = false;
+                        _savePreferences();
+                      }),
+                    ),
+                  ),
+                ),
+              // ── Dismiss overlay when settings panel is open ───────────────
               if (_settingsPanelOpen)
                 Positioned.fill(
                   child: GestureDetector(
@@ -769,17 +847,29 @@ class _AppGridState extends State<_AppGrid> {
   void jumpToIndex(int index) {
     if (!_scrollController.hasClients) return;
     final w = widget.constraints.maxWidth;
-    final int baseCount = w > 1200
+    final int baseCount = w > 1600
+        ? 6
+        : w > 1200
         ? 5
-        : w > 800
+        : w > 900
         ? 4
+        : w > 620
+        ? 3
         : 2;
     final int crossAxisCount = (baseCount / widget.cardSizeMultiplier)
         .round()
-        .clamp(1, 10);
+        .clamp(1, 12);
 
-    const double hPad = 24.0;
-    const double spacing = 24.0;
+    final double hPad = w > 1200
+        ? 16.0
+        : w > 900
+        ? 12.0
+        : 10.0;
+    final double spacing = w > 1200
+        ? 16.0
+        : w > 900
+        ? 12.0
+        : 10.0;
     const double aspectRatio = 0.75;
 
     final double usableWidth = w - 2 * hPad - (crossAxisCount - 1) * spacing;
@@ -800,14 +890,30 @@ class _AppGridState extends State<_AppGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final int baseCount = widget.constraints.maxWidth > 1200
+    final double w = widget.constraints.maxWidth;
+    final int baseCount = w > 1600
+        ? 6
+        : w > 1200
         ? 5
-        : widget.constraints.maxWidth > 800
+        : w > 900
         ? 4
+        : w > 620
+        ? 3
         : 2;
     final int crossAxisCount = (baseCount / widget.cardSizeMultiplier)
         .round()
-        .clamp(1, 10);
+        .clamp(1, 12);
+    final double hPad = w > 1200
+        ? 16.0
+        : w > 900
+        ? 12.0
+        : 10.0;
+    final double vPad = w > 1200 ? 16.0 : 12.0;
+    final double spacing = w > 1200
+        ? 16.0
+        : w > 900
+        ? 12.0
+        : 10.0;
 
     return Stack(
       children: [
@@ -819,16 +925,13 @@ class _AppGridState extends State<_AppGrid> {
             controller: _scrollController,
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 24,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
                     childAspectRatio: 0.75,
-                    crossAxisSpacing: 24,
-                    mainAxisSpacing: 24,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     addAutomaticKeepAlives: false,
@@ -859,61 +962,92 @@ class _AppGridState extends State<_AppGrid> {
                   ignoring: !_sliderVisible,
                   child: ValueListenableBuilder<double>(
                     valueListenable: widget.cardSizeNotifier,
-                    builder: (ctx, cardSize, _) => Container(
-                      width: 160,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          ctx,
-                        ).colorScheme.surface.withValues(alpha: 0.88),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
+                    builder: (ctx, cardSize, _) {
+                      final isDark =
+                          Theme.of(ctx).brightness == Brightness.dark;
+                      final accent = Theme.of(ctx).colorScheme.primary;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: kBlurBase,
+                            sigmaY: kBlurBase,
                           ),
-                        ],
-                        border: Border.all(
-                          color: Theme.of(
-                            ctx,
-                          ).colorScheme.outline.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: SliderTheme(
-                        data: SliderTheme.of(ctx).copyWith(
-                          trackHeight: 2,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 6,
+                          child: Container(
+                            width: 168,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: glassColor(isDark),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white.withValues(
+                                  alpha: kLightCatchBright,
+                                ),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accent.withValues(alpha: 0.15),
+                                  blurRadius: kGlowBlur * 1.5,
+                                  spreadRadius: 0,
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.25),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.view_module_rounded,
+                                  size: 14,
+                                  color: accent.withValues(alpha: 0.7),
+                                ),
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(ctx).copyWith(
+                                      trackHeight: 2,
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 5,
+                                      ),
+                                      overlayShape:
+                                          const RoundSliderOverlayShape(
+                                            overlayRadius: 10,
+                                          ),
+                                      activeTrackColor: accent.withValues(
+                                        alpha: 0.75,
+                                      ),
+                                      inactiveTrackColor: Colors.white
+                                          .withValues(alpha: 0.15),
+                                      thumbColor: accent,
+                                    ),
+                                    child: Slider(
+                                      value: cardSize,
+                                      min: 0.5,
+                                      max: 2.0,
+                                      divisions: 6,
+                                      onChanged: (v) =>
+                                          widget.cardSizeNotifier.value = v,
+                                      onChangeEnd: (v) {
+                                        if (v <= 0.5) {
+                                          widget.onSwitchToMasterDetail?.call();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 12,
-                          ),
-                          activeTrackColor: Theme.of(
-                            ctx,
-                          ).colorScheme.primary.withValues(alpha: 0.7),
-                          inactiveTrackColor: Theme.of(
-                            ctx,
-                          ).colorScheme.onSurface.withValues(alpha: 0.18),
-                          thumbColor: Theme.of(ctx).colorScheme.primary,
                         ),
-                        child: Slider(
-                          value: cardSize,
-                          min: 0.5,
-                          max: 2.0,
-                          divisions: 6,
-                          onChanged: (v) => widget.cardSizeNotifier.value = v,
-                          onChangeEnd: (v) {
-                            if (v <= 0.5) {
-                              widget.onSwitchToMasterDetail?.call();
-                            }
-                          },
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -923,14 +1057,60 @@ class _AppGridState extends State<_AppGrid> {
                 duration: const Duration(milliseconds: 250),
                 child: IgnorePointer(
                   ignoring: !_showFab,
-                  child: FloatingActionButton.small(
-                    onPressed: () => _scrollController.animateTo(
-                      0,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeInOut,
-                    ),
-                    tooltip: 'Scroll to top',
-                    child: const Icon(Icons.keyboard_arrow_up),
+                  child: Builder(
+                    builder: (ctx) {
+                      final isDark =
+                          Theme.of(ctx).brightness == Brightness.dark;
+                      final accent = Theme.of(ctx).colorScheme.primary;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: kBlurBase,
+                            sigmaY: kBlurBase,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(999),
+                              onTap: () => _scrollController.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 400),
+                                curve: Curves.easeInOut,
+                              ),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: glassColor(isDark),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(
+                                      alpha: kLightCatchBright,
+                                    ),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: accent.withValues(alpha: 0.18),
+                                      blurRadius: kGlowBlur,
+                                      spreadRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.keyboard_arrow_up,
+                                  size: 18,
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.9)
+                                      : Colors.black.withValues(alpha: 0.8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

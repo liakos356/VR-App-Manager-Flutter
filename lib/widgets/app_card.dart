@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -11,6 +12,7 @@ import '../services/store_favorites_service.dart';
 import '../utils/formatters.dart';
 import '../utils/install_checker.dart';
 import '../utils/localization.dart';
+import '../utils/spatial_theme.dart';
 import 'app_detail_view.dart';
 import 'install_bottom_sheet.dart';
 import 'star_rating.dart';
@@ -169,16 +171,22 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
           apiUrl: widget.apiUrl,
           showAsPage: true,
         ),
-        transitionsBuilder: (_, animation, _, child) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween(
-              begin: const Offset(0.0, 1.0),
-              end: Offset.zero,
-            ).chain(CurveTween(curve: Curves.easeInOut)).animate(animation),
-            child: child,
-          ),
-        ),
+        transitionsBuilder: (_, animation, _, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutQuint,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween(
+                begin: const Offset(0.0, 0.06),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -194,6 +202,8 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = Theme.of(context).colorScheme.primary;
     final images = _cachedImages;
     final isOvrport =
         widget.app['ovrport'] == 1 ||
@@ -226,412 +236,380 @@ class AppCardState extends State<AppCard> with SingleTickerProviderStateMixin {
 
     return RepaintBoundary(
       child: Opacity(
-        opacity: isUnavailable ? 0.70 : 1.0,
+        opacity: isUnavailable ? 0.62 : 1.0,
+        // Hover lift + scale
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: _isHovered ? 1.0 : 0.0),
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutQuint,
           builder: (context, t, child) {
             return Transform(
               alignment: Alignment.center,
               transform: Matrix4.identity()
-                ..translateByDouble(0.0, -8.0 * t, 0.0, 1.0)
-                ..scaleByDouble(1.0 + 0.03 * t, 1.0 + 0.03 * t, 1.0, 1.0),
+                ..translateByDouble(0.0, -6.0 * t, 0.0, 1.0)
+                ..scaleByDouble(1.0 + 0.05 * t, 1.0 + 0.05 * t, 1.0, 1.0),
               child: child,
             );
           },
-          child: Card(
-            elevation: _isHovered ? 18 : 6,
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _isHovered = true),
-              onExit: (_) => setState(() => _isHovered = false),
-              cursor: SystemMouseCursors.click,
-              child: InkWell(
-                onTap: () => _showDetails(context),
-                onLongPress: () => showInstallBottomSheet(
-                  context,
-                  app: widget.app,
-                  isInstalled: _isInstalled,
-                  installedPackageName: _installedPackageName,
-                  onInstallDone: _refreshInstallState,
-                ),
-                splashColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.18),
-                highlightColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.08),
-                hoverColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.05),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ── Image carousel ─────────────────────────────────────
-                    Expanded(
-                      flex: 5,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          images.isNotEmpty
-                              ? _CardImageCarousel(
-                                  images: images,
-                                  currentIndex: _currentImageIndex,
-                                  isHovered: _isHovered,
-                                  hasMultiple: images.length > 1,
-                                  onPrev: () => setState(() {
-                                    _currentImageIndex =
-                                        (_currentImageIndex -
-                                            1 +
-                                            images.length) %
-                                        images.length;
-                                  }),
-                                  onNext: () => setState(() {
-                                    _currentImageIndex =
-                                        (_currentImageIndex + 1) %
-                                        images.length;
-                                  }),
-                                )
-                              : Container(
-                                  color: Colors.grey[800],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.vrpano,
-                                      size: 64,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ),
-                          if (isOvrport)
-                            Positioned(
-                              top: 12,
-                              right: 12,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.redAccent.withValues(
-                                    alpha: 0.9,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Ovrport',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          // ── Drive update chip ───────────────────────────
-                          if (hasDriveUpdate)
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => showInstallBottomSheet(
-                                  context,
-                                  app: widget.app,
-                                  isInstalled: _isInstalled,
-                                  installedPackageName: _installedPackageName,
-                                  onInstallDone: _refreshInstallState,
-                                ),
-                                child: AnimatedBuilder(
-                                  animation: _flashAnimation,
-                                  builder: (context, child) => Opacity(
-                                    opacity: _flashAnimation.value,
-                                    child: child,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Colors.red,
-                                          blurRadius: 6,
-                                          spreadRadius: 1,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Text(
-                                      'NEW',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (isUnavailable)
-                            Positioned(
-                              top: 12,
-                              left: 12,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[800]!.withValues(
-                                    alpha: 0.9,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Unavailable',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          // ── Telegram download button ────────────────────
-                          if (_shouldShowDownloadButton())
-                            Positioned(
-                              top: isUnavailable ? 38 : 8,
-                              left: 8,
-                              child: _isQueueing
-                                  ? Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF229ED9),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      padding: const EdgeInsets.all(6),
-                                      child: const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: _queueDownload,
-                                      child: Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF229ED9),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.downloading,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                          if (isNewApp)
-                            Positioned(
-                              bottom: 8,
-                              left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.92),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'New',
-                                  style: TextStyle(
-                                    color: Colors.black87,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (isUpdatedApp)
-                            Positioned(
-                              bottom: 8,
-                              left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withValues(
-                                    alpha: 0.92,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Updated',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          // ── Installed badge ─────────────────────────────
-                          if (_isInstalled)
-                            Positioned(
-                              bottom: 8,
-                              right: 38,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade600.withValues(
-                                    alpha: 0.92,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Installed',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          // ── Favorite star ───────────────────────────────
-                          Positioned(
-                            bottom: 6,
-                            right: 6,
-                            child: _FavoriteStarButton(
-                              appId: widget.app['id']?.toString() ?? '',
-                            ),
-                          ),
-                        ],
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true),
+            onExit: (_) => setState(() => _isHovered = false),
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => _showDetails(context),
+              onLongPress: () => showInstallBottomSheet(
+                context,
+                app: widget.app,
+                isInstalled: _isInstalled,
+                installedPackageName: _installedPackageName,
+                onInstallDone: _refreshInstallState,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(kRadius),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutQuint,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(kRadius),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: _isHovered
+                              ? (isDark ? 0.55 : 0.22)
+                              : (isDark ? 0.35 : 0.12),
+                        ),
+                        blurRadius: _isHovered ? 32 : 16,
+                        spreadRadius: _isHovered ? 2 : -2,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
+                      if (_isHovered)
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.18),
+                          blurRadius: 24,
+                          spreadRadius: 0,
+                        ),
+                    ],
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // ── Full-bleed artwork ──────────────────────────────
+                      images.isNotEmpty
+                          ? _CardImageCarousel(
+                              images: images,
+                              currentIndex: _currentImageIndex,
+                              isHovered: _isHovered,
+                              hasMultiple: images.length > 1,
+                              onPrev: () => setState(() {
+                                _currentImageIndex =
+                                    (_currentImageIndex - 1 + images.length) %
+                                    images.length;
+                              }),
+                              onNext: () => setState(() {
+                                _currentImageIndex =
+                                    (_currentImageIndex + 1) % images.length;
+                              }),
+                            )
+                          : Container(
+                              color: isDark
+                                  ? const Color(0xFF0D1420)
+                                  : const Color(0xFFD0D8E8),
+                              child: Center(
+                                child: Icon(
+                                  Icons.vrpano_outlined,
+                                  size: 64,
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                              ),
+                            ),
 
-                    // ── Info panel ─────────────────────────────────────────
-                    Expanded(
-                      flex: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(kRadius),
+                          ),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOutQuint,
+                              padding: const EdgeInsets.fromLTRB(10, 7, 10, 10),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.0),
+                                    Colors.black.withValues(
+                                      alpha: isDark ? 0.72 : 0.58,
+                                    ),
+                                  ],
+                                ),
+                                border: Border(
+                                  top: BorderSide(
+                                    color: Colors.white.withValues(
+                                      alpha: _isHovered ? 0.22 : 0.10,
+                                    ),
+                                    width: 1.0,
+                                  ),
+                                ),
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Flexible(
-                                    child: AutoSizeText(
-                                      widget.app['name'] ??
-                                          widget.app['title'] ??
-                                          'Unknown App',
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      minFontSize: 12,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (getAppSize(widget.app) > 0)
+                                  // ── Status chips row ──────────────────
+                                  if (isNewApp || isUpdatedApp || _isInstalled)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
-                                      child: Text(
-                                        'Size: ${formatBytes(getAppSize(widget.app))}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.color
-                                              ?.withValues(alpha: 0.7),
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Wrap(
+                                        spacing: 4,
+                                        runSpacing: 2,
+                                        children: [
+                                          if (isNewApp)
+                                            _SpatialBadge(
+                                              label: 'New',
+                                              accent: Colors.amber,
+                                              isActive: true,
+                                            ),
+                                          if (isUpdatedApp)
+                                            _SpatialBadge(
+                                              label: 'Updated',
+                                              accent: kMetaBlue,
+                                              isActive: true,
+                                            ),
+                                          if (_isInstalled)
+                                            _SpatialBadge(
+                                              label: 'Installed',
+                                              accent: Colors.green,
+                                              isActive: true,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  // ── Title + favorite star ─────────────
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: AutoSizeText(
+                                          widget.app['name'] ??
+                                              widget.app['title'] ??
+                                              'Unknown App',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.black54,
+                                                blurRadius: 6,
+                                              ),
+                                            ],
+                                          ),
+                                          minFontSize: 9,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 4),
+                                      _FavoriteStarButton(
+                                        appId: widget.app['id']?.toString() ??
+                                            '',
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  // ── Genre + stars + size ──────────────
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: _SpatialBadge(
+                                          label: (widget.app['genres'] ??
+                                                  widget.app['category'] ??
+                                                  '')
+                                              as String,
+                                          accent: accent,
+                                          isActive: true,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      StarRating(
+                                        rating: parseRating(
+                                          widget.app['user_rating'] ??
+                                              widget.app['rating'],
+                                        ),
+                                        size: 12,
+                                      ),
+                                      if (getAppSize(widget.app) > 0) ...[
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          formatBytes(getAppSize(widget.app)),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.55,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: AutoSizeText(
-                                      (widget.app['genres'] ??
-                                              widget.app['category'] ??
-                                              '')
-                                          as String,
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      minFontSize: 10,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                StarRating(
-                                  rating: parseRating(
-                                    widget.app['user_rating'] ??
-                                        widget.app['rating'],
-                                  ),
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+
+                      // ── 1px light-catch border (brightens on hover) ─────
+                      Positioned.fill(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutQuint,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(kRadius),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withValues(
+                                  alpha: _isHovered ? 0.28 : 0.14,
+                                ),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                              stops: const [0.0, 0.5],
+                            ),
+                          ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(kRadius),
+                              border: Border.all(
+                                color: Colors.white.withValues(
+                                  alpha: _isHovered ? 0.28 : 0.12,
+                                ),
+                                width: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ── Ovrport badge ───────────────────────────────────
+                      if (isOvrport)
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: _SpatialBadge(
+                            label: 'Ovrport',
+                            accent: Colors.deepOrange,
+                            isActive: true,
+                          ),
+                        ),
+
+                      // ── Drive update chip ───────────────────────────────
+                      if (hasDriveUpdate)
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => showInstallBottomSheet(
+                              context,
+                              app: widget.app,
+                              isInstalled: _isInstalled,
+                              installedPackageName: _installedPackageName,
+                              onInstallDone: _refreshInstallState,
+                            ),
+                            child: AnimatedBuilder(
+                              animation: _flashAnimation,
+                              builder: (context, child) => Opacity(
+                                opacity: _flashAnimation.value,
+                                child: child,
+                              ),
+                              child: _SpatialBadge(
+                                label: 'UPDATE',
+                                accent: Colors.red,
+                                isActive: true,
+                                glow: true,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // ── Unavailable badge ───────────────────────────────
+                      if (isUnavailable)
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: _SpatialBadge(
+                            label: 'Unavailable',
+                            accent: Colors.grey,
+                            isActive: false,
+                          ),
+                        ),
+
+                      // ── Telegram download button ────────────────────────
+                      if (_shouldShowDownloadButton())
+                        Positioned(
+                          top: isUnavailable ? 42 : 10,
+                          left: 10,
+                          child: _isQueueing
+                              ? Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF229ED9),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(5),
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _queueDownload,
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF229ED9),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF229ED9)
+                                              .withValues(alpha: 0.50),
+                                          blurRadius: 8,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.downloading,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ), // TweenAnimationBuilder
-      ), // Opacity
+        ),
+      ),
     );
   }
 }
-
 // ── Private helpers ───────────────────────────────────────────────────────────
+
 
 /// Small star button that reflects and toggles the favorite state for [appId].
 class _FavoriteStarButton extends StatelessWidget {
@@ -645,17 +623,101 @@ class _FavoriteStarButton extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => StoreFavoritesNotifier.instance.toggle(appId),
-      child: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          color: Colors.black45,
-          borderRadius: BorderRadius.circular(8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutQuint,
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: isFav
+                  ? Colors.amber.withValues(alpha: 0.80)
+                  : Colors.black.withValues(alpha: 0.45),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isFav
+                    ? Colors.amber.withValues(alpha: 0.80)
+                    : Colors.white.withValues(alpha: 0.15),
+                width: 1,
+              ),
+              boxShadow: isFav
+                  ? [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.50),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Icon(
+              isFav ? Icons.star_rounded : Icons.star_outline_rounded,
+              color: isFav ? Colors.white : Colors.white70,
+              size: 16,
+            ),
+          ),
         ),
-        child: Icon(
-          isFav ? Icons.star_rounded : Icons.star_border_rounded,
-          color: isFav ? Colors.amber : Colors.white70,
-          size: 20,
+      ),
+    );
+  }
+}
+
+/// A pill/capsule-shaped status badge with optional glow.
+class _SpatialBadge extends StatelessWidget {
+  final String label;
+  final Color accent;
+  final bool isActive;
+  final bool glow;
+
+  const _SpatialBadge({
+    required this.label,
+    required this.accent,
+    this.isActive = false,
+    this.glow = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (label.isEmpty) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isActive
+                ? accent.withValues(alpha: 0.78)
+                : Colors.black.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isActive
+                  ? accent.withValues(alpha: 0.90)
+                  : Colors.white.withValues(alpha: 0.15),
+              width: 1.0,
+            ),
+            boxShadow: glow
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.55),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : [],
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.95),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
         ),
       ),
     );

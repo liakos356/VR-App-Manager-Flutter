@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../utils/localization.dart';
+import '../utils/spatial_theme.dart';
 
 /// Search bar with autocomplete suggestions drawn from app names, categories,
 /// and tags, plus a recent-search history panel.
@@ -64,48 +66,89 @@ class _AppSearchFieldState extends State<AppSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return SearchAnchor(
       isFullScreen: false,
       searchController: widget.controller,
       viewConstraints: const BoxConstraints(maxHeight: 300),
-      viewBackgroundColor: colorScheme.surface,
+      viewBackgroundColor: null,
       viewHintText: 'Search apps...',
       viewOnSubmitted: (value) {
         widget.onSaveHistory(value);
         widget.controller.closeView(value);
       },
       builder: (BuildContext context, SearchController ctl) {
-        return Material(
-          elevation: 2,
-          borderRadius: BorderRadius.circular(20),
-          child: TextField(
-            controller: ctl,
-            onTap: () => ctl.openView(),
-            onChanged: (_) => ctl.openView(),
-            onSubmitted: (value) {
-              widget.onSaveHistory(value);
-              ctl.closeView(value);
-            },
-            decoration: InputDecoration(
-              hintText: 'Search apps...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              suffixIcon: _hasText
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: _clearSearch,
-                      tooltip: 'Clear search',
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide.none,
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final accent = Theme.of(context).colorScheme.primary;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: TextField(
+              controller: ctl,
+              onTap: () => ctl.openView(),
+              onChanged: (_) => ctl.openView(),
+              onSubmitted: (value) {
+                widget.onSaveHistory(value);
+                ctl.closeView(value);
+              },
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? Colors.white : Colors.black87,
               ),
-              filled: true,
-              fillColor: Theme.of(context).cardColor,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 0,
-                horizontal: 16,
+              decoration: InputDecoration(
+                hintText: 'Search apps...',
+                hintStyle: TextStyle(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.45)
+                      : Colors.black.withValues(alpha: 0.40),
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.55)
+                      : Colors.black.withValues(alpha: 0.45),
+                ),
+                suffixIcon: _hasText
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.55)
+                              : Colors.black.withValues(alpha: 0.45),
+                        ),
+                        onPressed: _clearSearch,
+                        tooltip: 'Clear search',
+                      )
+                    : null,
+                filled: true,
+                fillColor: inputGlassColor(isDark),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: kLightCatchBright),
+                    width: 1.0,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: kLightCatchBright),
+                    width: 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  borderSide: BorderSide(
+                    color: accent.withValues(alpha: 0.75),
+                    width: 1.5,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 16,
+                ),
               ),
             ),
           ),

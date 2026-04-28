@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1776341159409,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1777388258759,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,9 +8,9 @@\n   const AdjustableSplitView({\n     super.key,\n     required this.left,\n     required this.right,\n-    this.initialLeftWidthPercentage = 0.35,\n+    this.initialLeftWidthPercentage = 0.30,\n   });\n \n   @override\n   State<AdjustableSplitView> createState() => _AdjustableSplitViewState();\n@@ -44,17 +44,18 @@\n                   _leftWidthPercentage = newPercentage.clamp(0.2, 0.8);\n                 });\n               },\n               child: Container(\n-                width: 8,\n+                width: 10,\n                 color: Colors.transparent,\n                 child: Center(\n                   child: Container(\n-                    width: 2,\n-                    height: 40,\n+                    width: 3,\n+                    height: 36,\n                     decoration: BoxDecoration(\n-                      color: Theme.of(context).dividerColor,\n-                      borderRadius: BorderRadius.circular(2),\n+                      color: Theme.of(context).colorScheme.primary\n+                          .withValues(alpha: 0.35),\n+                      borderRadius: BorderRadius.circular(4),\n                     ),\n                   ),\n                 ),\n               ),\n"
                 }
             ],
             "date": 1776341159409,

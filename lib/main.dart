@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/home_screen.dart';
 import 'utils/installed_apps_cache.dart';
 import 'utils/localization.dart';
+import 'utils/spatial_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,66 +61,8 @@ class AppManagerApp extends StatelessWidget {
             return MaterialApp(
               title: 'VR App Manager',
               themeMode: currentMode,
-              theme: ThemeData.light().copyWith(
-                scaffoldBackgroundColor: const Color(0xFFF3F4F6),
-                cardColor: Colors.white,
-                appBarTheme: const AppBarTheme(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black87,
-                ),
-                colorScheme: ColorScheme.light(
-                  primary: lightAccent,
-                  secondary: lightAccent,
-                ),
-                switchTheme: SwitchThemeData(
-                  trackOutlineColor: WidgetStateProperty.all(
-                    Colors.transparent,
-                  ),
-                ),
-                inputDecorationTheme: InputDecorationTheme(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              darkTheme: ThemeData.dark().copyWith(
-                scaffoldBackgroundColor: const Color(0xFF1E1E1E),
-                cardColor: const Color(0xFF2D2D30),
-                appBarTheme: const AppBarTheme(
-                  backgroundColor: Color(0xFF252526),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                ),
-                colorScheme: ColorScheme.dark(
-                  primary: darkAccent,
-                  secondary: darkAccent,
-                  surface: const Color(0xFF2D2D30),
-                ),
-                switchTheme: SwitchThemeData(
-                  trackOutlineColor: WidgetStateProperty.all(
-                    Colors.transparent,
-                  ),
-                  trackColor: WidgetStateProperty.resolveWith((states) {
-                    if (states.contains(WidgetState.selected)) {
-                      return darkAccent;
-                    }
-                    return const Color(0xFF3E3E42);
-                  }),
-                  thumbColor: WidgetStateProperty.all(Colors.white),
-                ),
-                inputDecorationTheme: InputDecorationTheme(
-                  filled: true,
-                  fillColor: const Color(0xFF3E3E42),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  hintStyle: const TextStyle(color: Colors.white54),
-                ),
-              ),
+              theme: spatialLightTheme(lightAccent),
+            darkTheme: spatialDarkTheme(darkAccent),
               builder: (context, child) {
                 return ValueListenableBuilder<double>(
                   valueListenable: uiScaleNotifier,

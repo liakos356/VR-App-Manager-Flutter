@@ -9,7 +9,7 @@ class AdjustableSplitView extends StatefulWidget {
     super.key,
     required this.left,
     required this.right,
-    this.initialLeftWidthPercentage = 0.35,
+    this.initialLeftWidthPercentage = 0.30,
   });
 
   @override
@@ -45,15 +45,16 @@ class _AdjustableSplitViewState extends State<AdjustableSplitView> {
                 });
               },
               child: Container(
-                width: 8,
+                width: 10,
                 color: Colors.transparent,
                 child: Center(
                   child: Container(
-                    width: 2,
-                    height: 40,
+                    width: 3,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).dividerColor,
-                      borderRadius: BorderRadius.circular(2),
+                      color: Theme.of(context).colorScheme.primary
+                          .withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),

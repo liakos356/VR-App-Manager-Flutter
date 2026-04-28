@@ -1,22 +1,23 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import '../utils/spatial_theme.dart';
+
 /// Strips leading `#` characters and returns the display label for a genre.
-/// e.g. "#Action" → "Action", "All Genres" → "All Genres"
 String _displayGenre(String genre) {
   final stripped = genre.replaceFirst(RegExp(r'^#+'), '');
   return stripped.isEmpty ? genre : stripped;
 }
 
-/// Returns a 1–2 char abbreviation for use in the collapsed icon strip.
+/// Returns a 1–2 char abbreviation for the collapsed icon strip.
 String _genreAbbr(String genre) {
   if (genre == 'All Genres') return '★';
   final display = _displayGenre(genre);
   return display.isNotEmpty ? display.substring(0, 1).toUpperCase() : '?';
 }
 
-/// A collapsible side panel that lists genres with a search filter.
-/// When [isOpen] is true, it shows a 220px panel with a search field and
-/// the full genre list. When collapsed it shrinks to a 52px icon strip.
+/// Spatial Dock — a glass panel listing genres.
+/// Open: 220px frosted-glass panel. Collapsed: 52px icon strip bubble.
 class GenreSidePanel extends StatefulWidget {
   final List<String> genres;
   final String selected;
@@ -53,9 +54,7 @@ class _GenreSidePanelState extends State<GenreSidePanel> {
   @override
   void didUpdateWidget(GenreSidePanel old) {
     super.didUpdateWidget(old);
-    if (old.genres != widget.genres) {
-      _onSearch();
-    }
+    if (old.genres != widget.genres) _onSearch();
   }
 
   void _onSearch() {
@@ -77,300 +76,430 @@ class _GenreSidePanelState extends State<GenreSidePanel> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = Theme.of(context).colorScheme.primary;
     final isOpen = widget.isOpen;
 
-    // ── Palette ────────────────────────────────────────────────────────────
-    final panelBg = isDark
-        ? const Color(0xFF252526)   // matches AppBar dark bg
-        : Colors.white;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.09);
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.05)
-        : Colors.black.withValues(alpha: 0.04);
-    final selectedBg = colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.10);
-    final mutedText = isDark
-        ? Colors.white.withValues(alpha: 0.45)
-        : Colors.black.withValues(alpha: 0.38);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeInOut,
-      width: isOpen ? 220 : 52,
-      decoration: BoxDecoration(
-        color: panelBg,
-        border: Border(
-          right: BorderSide(color: borderColor, width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.07),
-            blurRadius: 10,
-            offset: const Offset(3, 0),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          if (isOpen) ...[
-            // ── Search field ──────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search genres…',
-                  hintStyle: TextStyle(fontSize: 12, color: mutedText),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    size: 16,
-                    color: mutedText,
+    return Padding(
+      // Floating margin — never pinned to the edge
+      padding: const EdgeInsets.symmetric(vertical: kFloatMargin),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutQuint,
+        width: isOpen ? 220 : 52,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: kBlurBase, sigmaY: kBlurBase),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuint,
+              decoration: BoxDecoration(
+                color: glassColor(isDark),
+                borderRadius: BorderRadius.circular(kRadius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: kLightCatchBright),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                    blurRadius: 24,
+                    spreadRadius: -4,
+                    offset: const Offset(4, 0),
                   ),
-                  prefixIconConstraints:
-                      const BoxConstraints(minWidth: 34, minHeight: 34),
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.white.withValues(alpha: 0.07)
-                      : Colors.black.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: borderColor, width: 1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(
-                      color: colorScheme.primary.withValues(alpha: 0.7),
-                      width: 1.5,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isOpen) ...[
+                    // ── Toggle collapse button ──────────────────────────
+                    _DockToggleButton(
+                      isOpen: true,
+                      isDark: isDark,
+                      accent: accent,
+                      onTap: widget.onToggle,
                     ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  isDense: true,
-                ),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-            ),
 
-            // ── Genre list ────────────────────────────────────────────────
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(top: 4, bottom: 12),
-                itemCount: _filtered.length,
-                itemBuilder: (context, i) {
-                  final genre = _filtered[i];
-                  final isAllGenres = genre == 'All Genres';
-                  final isSelected = genre == widget.selected;
-                  final count = widget.getGenreCount(genre);
-                  final displayName = _displayGenre(genre);
-
-                  return _GenreItem(
-                    label: displayName,
-                    count: count,
-                    isSelected: isSelected,
-                    isAllGenres: isAllGenres,
-                    isDark: isDark,
-                    selectedBg: selectedBg,
-                    hoverBg: hoverBg,
-                    primary: colorScheme.primary,
-                    mutedText: mutedText,
-                    onTap: () => widget.onChanged(genre),
-                  );
-                },
-              ),
-            ),
-          ] else ...[
-            // ── Collapsed icon strip ──────────────────────────────────────
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 4, bottom: 12),
-                child: Column(
-                  children: widget.genres.map((genre) {
-                    final isSelected = genre == widget.selected;
-                    final label = _genreAbbr(genre);
-                    final isAllGenres = genre == 'All Genres';
-
-                    return Tooltip(
-                      message: _displayGenre(genre),
-                      preferBelow: false,
-                      waitDuration: const Duration(milliseconds: 300),
-                      child: InkWell(
-                        onTap: () => widget.onChanged(genre),
-                        hoverColor: hoverBg,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          width: 52,
-                          height: 34,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isSelected ? selectedBg : Colors.transparent,
-                            border: Border(
-                              left: BorderSide(
-                                color: isSelected
-                                    ? colorScheme.primary
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            label,
+                    // ── Search field (carved glass) ─────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                          child: TextField(
+                            controller: _searchController,
                             style: TextStyle(
-                              fontSize: isAllGenres ? 14 : 12,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                              color: isSelected
-                                  ? colorScheme.primary
-                                  : isDark
-                                  ? Colors.white.withValues(alpha: 0.55)
-                                  : Colors.black.withValues(alpha: 0.5),
+                              fontSize: 12,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search genres…',
+                              hintStyle: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.45)
+                                    : Colors.black.withValues(alpha: 0.40),
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search_rounded,
+                                size: 15,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.45)
+                                    : Colors.black.withValues(alpha: 0.40),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              filled: true,
+                              fillColor: inputGlassColor(isDark),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(
+                                  color: Colors.white
+                                      .withValues(alpha: kLightCatchBright),
+                                  width: 1.0,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(
+                                  color: Colors.white
+                                      .withValues(alpha: kLightCatchBright),
+                                  width: 1.0,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(
+                                  color: accent.withValues(alpha: 0.70),
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 8,
+                              ),
+                              isDense: true,
                             ),
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
+                    ),
+
+                    // ── Genre list ─────────────────────────────────────
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(
+                          left: 8,
+                          right: 8,
+                          top: 4,
+                          bottom: 16,
+                        ),
+                        itemCount: _filtered.length,
+                        itemBuilder: (context, i) {
+                          final genre = _filtered[i];
+                          final isSelected = genre == widget.selected;
+                          final count = widget.getGenreCount(genre);
+
+                          return _DockGenreItem(
+                            label: _displayGenre(genre),
+                            count: count,
+                            isSelected: isSelected,
+                            isAllGenres: genre == 'All Genres',
+                            isDark: isDark,
+                            accent: accent,
+                            onTap: () => widget.onChanged(genre),
+                          );
+                        },
+                      ),
+                    ),
+                  ] else ...[
+                    // ── Collapsed icon strip ────────────────────────────
+                    _DockToggleButton(
+                      isOpen: false,
+                      isDark: isDark,
+                      accent: accent,
+                      onTap: widget.onToggle,
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          children: widget.genres.map((genre) {
+                            final isSelected = genre == widget.selected;
+                            final label = _genreAbbr(genre);
+
+                            return Tooltip(
+                              message: _displayGenre(genre),
+                              preferBelow: false,
+                              waitDuration: const Duration(milliseconds: 200),
+                              child: GestureDetector(
+                                onTap: () => widget.onChanged(genre),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  curve: Curves.easeOutQuint,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 3,
+                                  ),
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? accent.withValues(alpha: 0.85)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: isSelected
+                                        ? Border.all(
+                                            color: accent.withValues(
+                                              alpha: 0.90,
+                                            ),
+                                            width: 1,
+                                          )
+                                        : null,
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color: accent.withValues(
+                                                alpha: 0.45,
+                                              ),
+                                              blurRadius: kGlowBlur,
+                                            ),
+                                          ]
+                                        : [],
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : isDark
+                                          ? Colors.white.withValues(alpha: 0.55)
+                                          : Colors.black.withValues(alpha: 0.50),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dock collapse/expand toggle button ────────────────────────────────────────
+
+class _DockToggleButton extends StatelessWidget {
+  final bool isOpen;
+  final bool isDark;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _DockToggleButton({
+    required this.isOpen,
+    required this.isDark,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(isOpen ? 10 : 6, 10, isOpen ? 4 : 6, 6),
+      child: Row(
+        mainAxisAlignment:
+            isOpen ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+        children: [
+          if (isOpen)
+            Text(
+              'Genres',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.75)
+                    : Colors.black.withValues(alpha: 0.65),
+                letterSpacing: 0.6,
+              ),
+            ),
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: isDark ? 0.08 : 0.50),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: kLightCatchBright),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                isOpen
+                    ? Icons.keyboard_arrow_left_rounded
+                    : Icons.keyboard_arrow_right_rounded,
+                size: 16,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.70)
+                    : Colors.black.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Individual genre row ───────────────────────────────────────────────────────
+// ── Individual genre dock item ─────────────────────────────────────────────────
 
-class _GenreItem extends StatefulWidget {
+class _DockGenreItem extends StatefulWidget {
   final String label;
   final int count;
   final bool isSelected;
   final bool isAllGenres;
   final bool isDark;
-  final Color selectedBg;
-  final Color hoverBg;
-  final Color primary;
-  final Color mutedText;
+  final Color accent;
   final VoidCallback onTap;
 
-  const _GenreItem({
+  const _DockGenreItem({
     required this.label,
     required this.count,
     required this.isSelected,
     required this.isAllGenres,
     required this.isDark,
-    required this.selectedBg,
-    required this.hoverBg,
-    required this.primary,
-    required this.mutedText,
+    required this.accent,
     required this.onTap,
   });
 
   @override
-  State<_GenreItem> createState() => _GenreItemState();
+  State<_DockGenreItem> createState() => _DockGenreItemState();
 }
 
-class _GenreItemState extends State<_GenreItem> {
+class _DockGenreItemState extends State<_DockGenreItem> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = widget.isSelected
-        ? widget.primary
-        : widget.isDark
-        ? Colors.white.withValues(alpha: 0.82)
-        : Colors.black.withValues(alpha: 0.75);
-    final badgeBg = widget.isSelected
-        ? widget.primary.withValues(alpha: 0.18)
-        : widget.isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.07);
-    final badgeText = widget.isSelected
-        ? widget.primary
-        : widget.mutedText;
-
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: widget.isSelected
-                ? widget.selectedBg
-                : _hovered
-                ? widget.hoverBg
-                : Colors.transparent,
-            border: Border(
-              left: BorderSide(
-                color: widget.isSelected
-                    ? widget.primary
-                    : Colors.transparent,
-                width: 3,
-              ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutQuint,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: widget.isSelected
+                  ? widget.accent.withValues(alpha: 0.82)
+                  : _hovered
+                  ? Colors.white.withValues(alpha: widget.isDark ? 0.08 : 0.30)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              border: widget.isSelected
+                  ? Border.all(
+                      color: widget.accent.withValues(alpha: 0.90),
+                      width: 1.0,
+                    )
+                  : _hovered
+                  ? Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 1.0,
+                    )
+                  : null,
+              boxShadow: widget.isSelected
+                  ? [
+                      BoxShadow(
+                        color: widget.accent.withValues(alpha: 0.35),
+                        blurRadius: kGlowBlur,
+                        spreadRadius: kGlowSpread,
+                      ),
+                    ]
+                  : [],
             ),
-          ),
-          child: Row(
-            children: [
-              // Icon for "All Genres"
-              if (widget.isAllGenres) ...[
-                Icon(
-                  Icons.apps_rounded,
-                  size: 13,
-                  color: widget.isSelected ? widget.primary : widget.mutedText,
+            child: Row(
+              children: [
+                if (widget.isAllGenres) ...[
+                  Icon(
+                    Icons.apps_rounded,
+                    size: 12,
+                    color: widget.isSelected
+                        ? Colors.white
+                        : widget.isDark
+                        ? Colors.white.withValues(alpha: 0.55)
+                        : Colors.black.withValues(alpha: 0.45),
+                  ),
+                  const SizedBox(width: 5),
+                ],
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: widget.isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: widget.isSelected
+                          ? Colors.white
+                          : widget.isDark
+                          ? Colors.white.withValues(alpha: 0.80)
+                          : Colors.black.withValues(alpha: 0.72),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isSelected
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : Colors.white.withValues(
+                            alpha: widget.isDark ? 0.08 : 0.40,
+                          ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${widget.count}',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: widget.isSelected
+                          ? Colors.white
+                          : widget.isDark
+                          ? Colors.white.withValues(alpha: 0.55)
+                          : Colors.black.withValues(alpha: 0.50),
+                    ),
+                  ),
+                ),
               ],
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: widget.isSelected
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                    color: textColor,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 130),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  '${widget.count}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: badgeText,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

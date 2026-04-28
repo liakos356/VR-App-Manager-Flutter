@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:installed_apps/installed_apps.dart';
 
 import '../install_service.dart';
 import '../utils/installed_apps_cache.dart';
 import '../utils/localization.dart';
+import '../utils/spatial_theme.dart';
 
 /// Opens a bottom sheet to install or uninstall [app].
 ///
@@ -22,8 +24,10 @@ void showInstallBottomSheet(
 
   showModalBottomSheet(
     context: context,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.60),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(kRadius)),
     ),
     builder: (_) => _InstallSheet(
       app: app,
@@ -125,61 +129,130 @@ class _InstallSheetState extends State<_InstallSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${widget.isInstalled ? tr('Uninstall') : tr('Install')} $_appName?',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(kRadius)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: kBlurModal, sigmaY: kBlurModal),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.85),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(kRadius),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: kLightCatchBright),
+                width: 1.0,
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            widget.isInstalled
-                ? tr('This will uninstall the app from your headset.')
-                : tr(
-                    'Do you want to send this app to your headset for installation?',
-                  ),
-            style: const TextStyle(fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              if (_installing)
-              IconButton(
-                onPressed: () => setState(() => _cancelled = true),
-                icon: const Icon(Icons.stop_circle_outlined),
-                iconSize: 48,
-                color: Colors.red.shade400,
-                tooltip: tr('Cancel'),
-              )
-            else
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                child: Text(tr('Cancel'), style: const TextStyle(fontSize: 18)),
-              ),
-              _InstallProgressButton(
-                isInstalled: widget.isInstalled,
-                installing: _installing,
-                progress: _progress,
-                status: _status,
-                onTap: _installing
-                    ? null
-                    : (widget.isInstalled ? _startUninstall : _startInstall),
-              ),
-            ],
+                Text(
+                  '${widget.isInstalled ? tr('Uninstall') : tr('Install')} $_appName?',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  widget.isInstalled
+                      ? tr('This will uninstall the app from your headset.')
+                      : tr(
+                          'Do you want to send this app to your headset for installation?',
+                        ),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.65)
+                        : Colors.black.withValues(alpha: 0.55),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    if (_installing)
+                      _SpatialActionButton(
+                        onPressed: () => setState(() => _cancelled = true),
+                        isDark: isDark,
+                        accentColor: Colors.redAccent,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.stop_circle_outlined,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              tr('Cancel'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      _SpatialActionButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        isDark: isDark,
+                        child: Text(
+                          tr('Cancel'),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.80)
+                                : Colors.black.withValues(alpha: 0.70),
+                          ),
+                        ),
+                      ),
+                    _InstallProgressButton(
+                      isInstalled: widget.isInstalled,
+                      installing: _installing,
+                      progress: _progress,
+                      status: _status,
+                      isDark: isDark,
+                      accent: accent,
+                      onTap: _installing
+                          ? null
+                          : (widget.isInstalled
+                              ? _startUninstall
+                              : _startInstall),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -193,6 +266,8 @@ class _InstallProgressButton extends StatelessWidget {
   final bool installing;
   final double progress;
   final String status;
+  final bool isDark;
+  final Color accent;
   final VoidCallback? onTap;
 
   const _InstallProgressButton({
@@ -200,58 +275,160 @@ class _InstallProgressButton extends StatelessWidget {
     required this.installing,
     required this.progress,
     required this.status,
+    required this.isDark,
+    required this.accent,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = installing
-        ? Colors.grey.shade800
-        : (isInstalled ? Colors.red.shade600 : Colors.green.shade600);
+    final Color buttonColor = installing
+        ? Colors.grey.shade700
+        : (isInstalled ? Colors.redAccent.shade400 : Colors.green.shade500);
 
     final label = installing
         ? (progress > 0.0 && progress < 1.0
-              ? '${(progress * 100).toInt()}%'
-              : status)
+            ? '${(progress * 100).toInt()}%'
+            : status)
         : (isInstalled ? tr('Uninstall') : tr('Install'));
 
-    return Container(
-      height: 55,
-      width: 200,
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Stack(
-        children: [
-          if (installing)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: progress,
-                child: Container(color: Colors.green.shade600),
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutQuint,
+            height: 52,
+            width: 180,
+            decoration: BoxDecoration(
+              color: buttonColor.withValues(alpha: onTap != null ? 0.90 : 0.50),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: buttonColor.withValues(alpha: 0.80),
+                width: 1.0,
               ),
+              boxShadow: onTap != null
+                  ? [
+                      BoxShadow(
+                        color: buttonColor.withValues(alpha: 0.40),
+                        blurRadius: kGlowBlur,
+                        spreadRadius: kGlowSpread,
+                      ),
+                    ]
+                  : [],
             ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              child: Center(
-                child: Text(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (installing && progress > 0.0)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: progress.clamp(0.0, 1.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Text(
                   label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    letterSpacing: 0.2,
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A generic ghost/outlined action button for the install sheet.
+class _SpatialActionButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onPressed;
+  final bool isDark;
+  final Color? accentColor;
+
+  const _SpatialActionButton({
+    required this.child,
+    required this.onPressed,
+    required this.isDark,
+    this.accentColor,
+  });
+
+  @override
+  State<_SpatialActionButton> createState() => _SpatialActionButtonState();
+}
+
+class _SpatialActionButtonState extends State<_SpatialActionButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1.0, end: _pressed ? 0.95 : 1.0),
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOutQuint,
+        builder: (_, scale, child) =>
+            Transform.scale(scale: scale, child: child),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              decoration: BoxDecoration(
+                color: widget.accentColor != null
+                    ? widget.accentColor!.withValues(alpha: _pressed ? 0.70 : 0.85)
+                    : Colors.white.withValues(
+                        alpha: widget.isDark ? 0.08 : 0.40,
+                      ),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: widget.accentColor != null
+                      ? widget.accentColor!.withValues(alpha: 0.80)
+                      : Colors.white.withValues(alpha: kLightCatchBright),
+                  width: 1.0,
+                ),
+                boxShadow: _pressed
+                    ? []
+                    : widget.accentColor != null
+                    ? [
+                        BoxShadow(
+                          color: widget.accentColor!.withValues(alpha: 0.30),
+                          blurRadius: kGlowBlur,
+                          spreadRadius: kGlowSpread,
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Center(child: widget.child),
+            ),
+          ),
+        ),
       ),
     );
   }

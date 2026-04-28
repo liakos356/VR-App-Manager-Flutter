@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:installed_apps/app_info.dart';
 import 'package:installed_apps/installed_apps.dart';
@@ -6,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/app_enrichment_service.dart';
 import '../services/favorites_service.dart';
 import '../utils/installed_apps_cache.dart';
+import '../utils/spatial_theme.dart';
 import '../widgets/adjustable_split_view.dart';
 import '../widgets/installed_app_detail_panel.dart';
 
@@ -444,9 +447,44 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
       children: [
         // The Top Toolbar replacing both AppBar and MainFilterBar
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            children: [
+          padding: const EdgeInsets.symmetric(
+            horizontal: kFloatMargin,
+            vertical: 2.0,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: kBlurBase,
+                sigmaY: kBlurBase,
+              ),
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: glassColor(
+                    Theme.of(context).brightness == Brightness.dark,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: kLightCatchBright),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: Theme.of(context).brightness == Brightness.dark
+                            ? 0.35
+                            : 0.10,
+                      ),
+                      blurRadius: 24,
+                      spreadRadius: -4,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
               Text(
                 _isSelectionMode
                     ? '${_selectedPackages.length} selected'
@@ -722,6 +760,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
                 },
               ),
             ],
+                ),
+              ),
+            ),
           ),
         ),
 
@@ -1358,6 +1399,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
   }
 
   Widget _buildGridView(List<AppInfo> apps) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = Theme.of(context).colorScheme.primary;
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
@@ -1371,175 +1414,222 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> {
         final app = apps[index];
         final isSelected = _selectedPackages.contains(app.packageName);
         final isNew = _isNewApp(app);
+        final isFav = _favoritePackages.contains(app.packageName);
 
-        return Card(
-          elevation: isSelected ? 4 : 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: isSelected
-                ? BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 2,
-                  )
-                : BorderSide.none,
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: _isSelectionMode
-                ? () => _toggleSelection(app.packageName)
-                : () => InstalledApps.startApp(app.packageName),
-            onLongPress: () {
-              if (!_isSelectionMode) {
-                setState(() {
-                  _isSelectionMode = true;
-                  _selectedPackages.add(app.packageName);
-                });
-              }
-            },
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: app.icon != null
-                                  ? Image.memory(app.icon!, fit: BoxFit.contain)
-                                  : const Icon(Icons.android, size: 40),
+        return GestureDetector(
+          onTap: _isSelectionMode
+              ? () => _toggleSelection(app.packageName)
+              : () => InstalledApps.startApp(app.packageName),
+          onLongPress: () {
+            if (!_isSelectionMode) {
+              setState(() {
+                _isSelectionMode = true;
+                _selectedPackages.add(app.packageName);
+              });
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(kRadiusSmall),
+              border: Border.all(
+                color: isSelected
+                    ? accent
+                    : Colors.white.withValues(alpha: kLightCatchBright),
+                width: isSelected ? 2.0 : 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.12),
+                  blurRadius: 18,
+                  spreadRadius: -4,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(kRadiusSmall),
+              child: Stack(
+                children: [
+                  // App icon fill
+                  Positioned.fill(
+                    child: app.icon != null
+                        ? Image.memory(app.icon!, fit: BoxFit.cover)
+                        : Container(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.04),
+                            child: const Center(
+                              child: Icon(Icons.android, size: 40),
                             ),
-                            if (!_isSelectionMode)
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: GestureDetector(
-                                  onTap: () => _toggleFavorite(app.packageName),
-                                  child: Icon(
-                                    _favoritePackages.contains(app.packageName)
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    color:
-                                        _favoritePackages.contains(
-                                          app.packageName,
-                                        )
-                                        ? Colors.amber
-                                        : Colors.white70,
-                                    size: 18,
-                                    shadows: const [
-                                      Shadow(
-                                        color: Colors.black54,
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
+                          ),
+                  ),
+
+                  // Bottom frosted glass info bar
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(8, 5, 8, 7),
+                          color: glassColor(isDark),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                app.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.25,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        app.name,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      if (_appSizeLabels[app.packageName] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            _appSizeLabels[app.packageName]!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
+                              if (_appSizeLabels[app.packageName] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    _appSizeLabels[app.packageName]!,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.black45,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (isNew && !_isSelectionMode)
-                  Positioned(
-                    top: 4,
-                    left: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'NEW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
 
-                if (_isSelectionMode)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Checkbox(
-                      value: isSelected,
-                      onChanged: (val) => _toggleSelection(app.packageName),
-                    ),
-                  )
-                else
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_vert,
-                        size: 20,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(color: Colors.black87, blurRadius: 8),
-                          Shadow(color: Colors.black54, blurRadius: 3),
-                        ],
-                      ),
-                      padding: EdgeInsets.zero,
-                      onSelected: (value) {
-                        if (value == 'launch') {
-                          InstalledApps.startApp(app.packageName);
-                        }
-                        if (value == 'uninstall') _showUninstallDialog(app);
-                        if (value == 'details') _showDetailsDialog(app);
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'launch',
-                          child: Text('Launch'),
+                  // NEW badge
+                  if (isNew && !_isSelectionMode)
+                    Positioned(
+                      top: 5,
+                      left: 5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                        const PopupMenuItem(
-                          value: 'details',
-                          child: Text('More Details'),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        const PopupMenuItem(
-                          value: 'uninstall',
-                          child: Text(
-                            'Uninstall',
-                            style: TextStyle(color: Colors.red),
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-              ],
+
+                  // Favorite star (frosted circle)
+                  if (!_isSelectionMode)
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => _toggleFavorite(app.packageName),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: isFav
+                                    ? Colors.amber.withValues(alpha: 0.85)
+                                    : Colors.black.withValues(alpha: 0.30),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isFav
+                                      ? Colors.amber.withValues(alpha: 0.80)
+                                      : Colors.white.withValues(alpha: 0.25),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                isFav
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 12,
+                                color: isFav ? Colors.black87 : Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Selection checkbox
+                  if (_isSelectionMode)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Checkbox(
+                        value: isSelected,
+                        onChanged: (val) => _toggleSelection(app.packageName),
+                      ),
+                    )
+                  else
+                    // 3-dot menu
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(
+                          Icons.more_vert,
+                          size: 20,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(color: Colors.black87, blurRadius: 8),
+                            Shadow(color: Colors.black54, blurRadius: 3),
+                          ],
+                        ),
+                        padding: EdgeInsets.zero,
+                        onSelected: (value) {
+                          if (value == 'launch') {
+                            InstalledApps.startApp(app.packageName);
+                          }
+                          if (value == 'uninstall') _showUninstallDialog(app);
+                          if (value == 'details') _showDetailsDialog(app);
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'launch',
+                            child: Text('Launch'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'details',
+                            child: Text('More Details'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'uninstall',
+                            child: Text(
+                              'Uninstall',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );

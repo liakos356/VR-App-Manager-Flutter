@@ -68,15 +68,9 @@ class AlphaIndexColumn extends StatelessWidget {
     final letters = computeAlphaIndex(apps);
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.09);
 
-    return Container(
-      width: 32,
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: borderColor, width: 1)),
-      ),
+    return SizedBox(
+      width: 28,
       child: letters.isEmpty
           ? const SizedBox.shrink()
           : SingleChildScrollView(
@@ -118,11 +112,6 @@ class _AlphaLetterButtonState extends State<_AlphaLetterButton> {
   @override
   Widget build(BuildContext context) {
     final isMultiChar = widget.letter.length > 1; // '0-9' or '#'
-    final textColor = _hovered
-        ? widget.colorScheme.primary
-        : widget.isDark
-        ? Colors.white.withValues(alpha: 0.65)
-        : Colors.black.withValues(alpha: 0.55);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -131,20 +120,33 @@ class _AlphaLetterButtonState extends State<_AlphaLetterButton> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          width: 32,
-          height: 22,
+          duration: const Duration(milliseconds: 120),
+          width: 28,
+          height: 20,
           alignment: Alignment.center,
-          color: _hovered
-              ? widget.colorScheme.primary.withValues(alpha: 0.08)
-              : Colors.transparent,
-          child: Text(
-            widget.letter,
-            style: TextStyle(
-              fontSize: isMultiChar ? 8.0 : 11.0,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-              height: 1.0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            width: _hovered ? 26 : 22,
+            height: _hovered ? 16 : 14,
+            decoration: BoxDecoration(
+              color: _hovered
+                  ? widget.colorScheme.primary.withValues(alpha: 0.14)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              widget.letter,
+              style: TextStyle(
+                fontSize: isMultiChar ? 7.5 : 10.5,
+                fontWeight: _hovered ? FontWeight.w700 : FontWeight.w500,
+                color: _hovered
+                    ? widget.colorScheme.primary
+                    : widget.isDark
+                    ? Colors.white.withValues(alpha: 0.50)
+                    : Colors.black.withValues(alpha: 0.42),
+                height: 1.0,
+              ),
             ),
           ),
         ),
